@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [claude/luinus-control-center-arj64r]
+    branches: [main, claude/luinus-control-center-arj64r]
   workflow_dispatch:
 
 permissions:
