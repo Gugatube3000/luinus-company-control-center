@@ -39,6 +39,10 @@ _Last updated: 2026-07-04_
 
 - [ ] 📱 Phone app: set the `SITE_PASSWORD` repo secret (Settings → Secrets →
       Actions), merge to main, then open the Pages URL and Add to Home Screen
+- [ ] 📱 In the app's ⚙️ Settings: add an Anthropic API key (enables Chat) and a
+      fine-grained GitHub token (enables checkbox sync)
+- [ ] 🔒 Make the repo private (Settings → General → Danger Zone) — note: Pages
+      on a private repo needs GitHub Pro, or move hosting to Cloudflare Pages
 - [ ] ⚠️ Decide repo visibility: repo is currently PUBLIC — raw files readable
       on GitHub (site content is encrypted, `personal/` vault is encrypted)
 - [ ] Connect claude.ai connectors: Gmail, Google Calendar, Notion (see `docs/integrations.md`)

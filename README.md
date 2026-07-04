@@ -35,10 +35,19 @@ GitHub, in any editor, and any AI agent can operate it.
 
 ## 📱 The phone app (GitHub Pages)
 
-`site/` is a password-protected mobile web app of this whole control center.
-The deploy publishes **encrypted content only** (AES-256-GCM, password =
-the `SITE_PASSWORD` repo secret); it decrypts in your browser after you enter
-the password. `personal/` is never included, even encrypted.
+`site/` is a password-protected mobile dashboard of this whole control center:
+
+- **Overview** — live countdown tiles to key dates (parsed from `NOW.md`) and
+  a tasks-completed-by-area progress chart.
+- **Interactive tasks** — tap any checkbox to toggle it; **⬆ Sync** commits
+  the changed files straight back to this repo (needs a fine-grained GitHub
+  token with Contents R/W on this repo, entered in ⚙️ Settings).
+- **💬 Chat** — talk to the control center. Claude (`claude-opus-4-8`) answers
+  with every area's current files in context (needs an Anthropic API key in
+  Settings). Keys live only in the phone's localStorage.
+- **Security** — the deploy publishes **encrypted content only** (AES-256-GCM,
+  password = the `SITE_PASSWORD` repo secret); it decrypts in the browser after
+  you enter the password. `personal/` is never included, even encrypted.
 
 One-time setup: repo **Settings → Secrets and variables → Actions → New
 repository secret** → name `SITE_PASSWORD`, value = the password you want to

@@ -21,8 +21,7 @@
       <h1>Control Center</h1>
       <p class="gate-sub">Content is encrypted. Enter your password to unlock.</p>
       <form id="gate-form">
-        <input id="gate-pass" type="password" inputmode="text" autocomplete="current-password"
-               placeholder="Password" autofocus>
+        <input id="gate-pass" type="password" autocomplete="current-password" placeholder="Password" autofocus>
         <label class="gate-remember">
           <input id="gate-remember" type="checkbox"> Remember on this device
         </label>
@@ -52,12 +51,54 @@
   <!-- app -->
   <div id="app" hidden>
     <header class="topbar">
-      <span class="topbar-title" id="topbar-title">NOW</span>
+      <span class="topbar-title" id="topbar-title">Overview</span>
       <span class="topbar-meta" id="topbar-meta"></span>
-      <button class="lock-btn" id="lock-btn" title="Lock">🔒</button>
+      <button class="chip-btn" id="sync-btn" hidden>⬆ Sync <span id="sync-count"></span></button>
+      <button class="icon-btn" id="settings-btn" title="Settings">⚙️</button>
     </header>
     <main id="content"></main>
+
+    <!-- chat view (kept mounted so the thread survives tab switches) -->
+    <div id="chat" hidden>
+      <div id="chat-log" class="chat-log">
+        <div class="chat-hello">
+          <div class="gate-logo">🛰️</div>
+          <p><b>Talk to your control center.</b></p>
+          <p class="muted">Claude answers with your NOW board, all five areas, goals and
+          tasks already in context. Add your Anthropic API key in ⚙️ Settings to enable.</p>
+        </div>
+      </div>
+      <form id="chat-form" class="chat-form">
+        <textarea id="chat-input" rows="1" placeholder="Ask anything… e.g. What should I focus on today?"></textarea>
+        <button type="submit" id="chat-send">➤</button>
+      </form>
+    </div>
+
     <nav class="tabbar" id="tabbar"></nav>
+  </div>
+
+  <!-- settings sheet -->
+  <div id="settings" class="sheet-backdrop" hidden>
+    <div class="sheet">
+      <h2>Settings</h2>
+
+      <label class="field-label">Anthropic API key <span class="muted">— powers the Chat tab</span></label>
+      <input id="set-anthropic" type="password" placeholder="sk-ant-…">
+      <p class="field-hint">Create at console.anthropic.com → API keys. Stored only in this
+      browser (localStorage), sent only to api.anthropic.com.</p>
+
+      <label class="field-label">GitHub token <span class="muted">— lets checkbox taps sync back to the repo</span></label>
+      <input id="set-github" type="password" placeholder="github_pat_…">
+      <p class="field-hint">Fine-grained token: GitHub → Settings → Developer settings →
+      Fine-grained tokens → only this repo → Contents: Read &amp; write. Stored only in this browser.</p>
+
+      <div class="sheet-actions">
+        <button id="set-save" class="primary">Save</button>
+        <button id="set-close">Close</button>
+      </div>
+      <hr>
+      <button id="lock-btn" class="danger-link">🔒 Lock the dashboard (forget password on this device)</button>
+    </div>
   </div>
 
   <script src="app.js"></script>
