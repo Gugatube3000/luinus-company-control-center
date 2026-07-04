@@ -37,6 +37,10 @@ _Last updated: 2026-07-04_
 
 ## 🔌 Setup still pending
 
+- [ ] 📱 Phone app: set the `SITE_PASSWORD` repo secret (Settings → Secrets →
+      Actions), merge to main, then open the Pages URL and Add to Home Screen
+- [ ] ⚠️ Decide repo visibility: repo is currently PUBLIC — raw files readable
+      on GitHub (site content is encrypted, `personal/` vault is encrypted)
 - [ ] Connect claude.ai connectors: Gmail, Google Calendar, Notion (see `docs/integrations.md`)
 - [ ] Wire Obsidian vault (Luinus notes) — options in `docs/integrations.md`
 - [ ] One-time: initialize the personal vault passphrase (`personal/unlock.sh` then `personal/lock.sh`)

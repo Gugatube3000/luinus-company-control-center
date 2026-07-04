@@ -29,13 +29,19 @@ jobs:
         with:
           enablement: true
 
-      # Deploy ONLY the Luinus dashboard app. Never widen this path:
-      # the rest of the repo is Gustavo's personal control center and
-      # must not be published to the public Pages site.
+      # Build the password-gated mobile control center. Area content is
+      # published ONLY as AES-256-GCM ciphertext (content.enc.json) encrypted
+      # with the SITE_PASSWORD secret; personal/ is never included at all.
+      # The public Luinus dashboard app is copied to /luinus-dashboard/.
+      - name: Build site
+        env:
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+        run: node site/build.mjs _site
+
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'luinus/dashboard'
+          path: '_site'
 
       - name: Deploy to GitHub Pages
         id: deployment

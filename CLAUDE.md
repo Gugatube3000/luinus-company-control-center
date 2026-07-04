@@ -43,9 +43,17 @@ mission control: orient, act, leave the board cleaner than you found it.
 
 ## Publishing boundary
 
-GitHub Pages deploys **only** `luinus/dashboard/` (see
-`.github/workflows/deploy-pages.yml`). Never widen that path, and never place
-personal/career/academic content inside `luinus/dashboard/`.
+GitHub Pages deploys the output of `node site/build.mjs` (see
+`.github/workflows/deploy-pages.yml`), which contains exactly three things:
+
+1. The app shell in `site/` (public code, zero content).
+2. `content.enc.json` — area markdown as **AES-256-GCM ciphertext only**,
+   encrypted with the `SITE_PASSWORD` repo secret.
+3. `luinus-dashboard/` — the public Luinus agents app from `luinus/dashboard/`.
+
+Rules: `personal/` is NEVER included in the build (not even ciphertext);
+plaintext area content must never be added to `site/` or the deploy artifact;
+never weaken the encryption path in `site/build.mjs`.
 
 ## Cadence
 

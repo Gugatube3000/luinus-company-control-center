@@ -33,12 +33,19 @@ GitHub, in any editor, and any AI agent can operate it.
   and exactly how to connect each one.
 - **`_templates/`** holds the weekly-review and daily-note templates.
 
-## The Luinus dashboard app
+## 📱 The phone app (GitHub Pages)
 
-The original mission-control web app for Luinus's AI agents lives at
-[`luinus/dashboard/`](./luinus/dashboard/) and is what GitHub Pages deploys —
-**only that folder is published**; the rest of this repo never goes to the
-public site.
+`site/` is a password-protected mobile web app of this whole control center.
+The deploy publishes **encrypted content only** (AES-256-GCM, password =
+the `SITE_PASSWORD` repo secret); it decrypts in your browser after you enter
+the password. `personal/` is never included, even encrypted.
+
+One-time setup: repo **Settings → Secrets and variables → Actions → New
+repository secret** → name `SITE_PASSWORD`, value = the password you want to
+type on your phone. Then visit the Pages URL, unlock, and "Add to Home Screen".
+
+The Luinus agents dashboard ([`luinus/dashboard/`](./luinus/dashboard/)) is
+served publicly at `/luinus-dashboard/` on the same site.
 
 ## Design principles
 
