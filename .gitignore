@@ -1,0 +1,11 @@
+# Decrypted personal vault — NEVER commit plaintext. Only vault.tar.enc is tracked.
+personal/vault/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+
+# Obsidian workspace state (if this repo is opened as a vault)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json

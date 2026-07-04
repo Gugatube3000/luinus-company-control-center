@@ -1,80 +1,50 @@
-# Luinus Company Control Center
+# Gustavo's Control Center
 
-A standalone, premium **mission-control dashboard** for running a company of AI
-agents. Not a chatbot, not a generic admin panel — an operating system that lets
-a founder understand the company in under 15 seconds and act immediately.
+One repo that runs my whole life. Five areas, one dashboard, operated by me +
+Claude. Plain markdown so I own everything forever — it opens in Obsidian, in
+GitHub, in any editor, and any AI agent can operate it.
 
-> Built to answer five questions at a glance: **What are the agents doing right
-> now? What's blocked? What needs a human decision? What changed today? What
-> should happen next?**
+> **Start here every day → [`NOW.md`](./NOW.md)** — the single page that answers
+> "what matters today, what's coming, what's blocked."
 
-## Run it
+## The five areas
 
-Open `index.html` in any browser, or serve the folder with a static server:
+| Area | What it runs | Key date |
+|------|--------------|----------|
+| [`career/`](./career/) | Fisher Investments job + full-time search | Applications ramp **Aug 2026**, graduate **Dec 2026** |
+| [`luinus/`](./luinus/) | AI medical startup (agents dashboard lives here) | — |
+| [`fortis-lock/`](./fortis-lock/) | Amazon private label + Lowe's expansion | **Lowe's launch July 6, 2026** |
+| [`academics/`](./academics/) | Senior year, Economics @ University of Tampa | **Mises University July 19–26, 2026** |
+| [`personal/`](./personal/) 🔒 | Faith, relationships, friendships, family | Encrypted — passphrase required |
 
-```bash
-python3 -m http.server 8080   # then visit http://localhost:8080
-```
+## How it works
 
-No build step, no dependencies. State persists to `localStorage`.
+- **`NOW.md`** is the cockpit — top priorities across all areas, upcoming dates,
+  and what's blocked. Reviewed/updated in every session.
+- **Each area folder** has a `README.md` (the area dashboard), `goals.md`, and
+  `tasks.md`, plus area-specific files. Same shape everywhere, so nothing gets lost.
+- **`personal/`** is different: its contents live in an encrypted vault
+  (`personal/vault.tar.enc`). Nothing readable is ever committed — you need the
+  passphrase to unlock it. See [`personal/README.md`](./personal/README.md).
+- **`CLAUDE.md`** is the operating manual Claude loads in every session — the
+  rules, the cadence, and the privacy boundaries.
+- **`docs/integrations.md`** is the wiring guide — every MCP connector and API
+  to plug in (Gmail, Google Calendar, Notion, Obsidian, Amazon SP-API, Canvas…)
+  and exactly how to connect each one.
+- **`_templates/`** holds the weekly-review and daily-note templates.
 
-## The seven views
+## The Luinus dashboard app
 
-| View | What it's for |
-|------|---------------|
-| **Mission Control** | Company health tiles, the single highest-leverage next move, the CEO inbox, the risk radar, lane pulse, and the activity stream. |
-| **Kanban Board** | Every goal the agents are working, 24/7. Drag cards across **Backlog → In Progress → Blocked → Review/QA → Shipped**. |
-| **Agents** | The roster. Each card is actionable (Poke · Work · Pause · Escalate · Finish). Click to open the full drill-down. |
-| **Execution Queue** | Prioritized work with P0/P1/P2, sort-by-priority, status filters, and Done/Defer/Rerun actions. |
-| **Founder Decisions** | The CEO inbox — only the calls that need a human. Resolve · Approve · Reject · Send back · Keep open. |
-| **Alerts & Blockers** | Blocked lanes, unverified claims, provenance gaps, stale agents. Derived live from state, so it's always honest. |
-| **Agent Souls** | Each agent's operating contract — directive, principles, tools, decision rights, and voice. |
+The original mission-control web app for Luinus's AI agents lives at
+[`luinus/dashboard/`](./luinus/dashboard/) and is what GitHub Pages deploys —
+**only that folder is published**; the rest of this repo never goes to the
+public site.
 
-## Key interactions
+## Design principles
 
-- **24/7 Autopilot** — toggle in the sidebar. Agents advance the company loop on
-  their own (progress ticks, tasks flow across the Kanban, activity streams in).
-- **Drill-down drawer** — click any agent or task for runs, inputs/outputs,
-  errors, dependencies, related work, timeline, and next steps.
-- **Resolving a blocker decision** (e.g. pilot pricing) automatically unblocks
-  the waiting agent and moves its task forward — the dashboard is wired, not mocked.
-- **Refresh cycle** / **Advance company cycle** push the simulation forward.
-- **Export snapshot** downloads a JSON of the full company state (and copies it
-  to the clipboard) — an audit log you can hand off.
-
-## Agent souls
-
-The `souls/` directory holds a `soul.md` for each of the eight agents — the
-durable identity, judgment, and **tool discipline** an agent carries into every
-run. See [`souls/README.md`](./souls/README.md) for the shared charter.
-
-| Agent | Codename | Lane |
-|-------|----------|------|
-| COO / Orchestrator | Atlas | Orchestration |
-| Sales | Closer | Revenue |
-| Marketing | Signal | Revenue |
-| Product | Forge | Product |
-| Ops / Compliance | Anchor | Operations |
-| QA / Review | Sentinel | Quality |
-| Research | Scout | Research |
-| Customer Success | Harbor | Customer |
-
-The in-app **Agent Souls** view renders a structured summary of each; the `.md`
-files are the source of truth an agent runtime would actually load.
-
-## Files
-
-```
-index.html   — shell: sidebar nav, seven views, drill-down drawer
-styles.css   — dark, dense, mission-control design system
-data.js      — seed state (agents, tasks, decisions, alerts, activity)
-souls.js     — structured soul data for the in-app Souls view
-app.js       — state, routing, rendering, Kanban DnD, autopilot, actions
-souls/*.md   — canonical agent souls (the real deliverable)
-```
-
-## Wiring to real data later
-
-Everything renders from the `SEED` object in `data.js`. Swap that for real agent
-telemetry (same shape) and the UI works unchanged. Tasks are the single source of
-truth and power both the Execution Queue and the Kanban board.
+1. **One page to rule them** — if `NOW.md` doesn't drive an action, fix `NOW.md`.
+2. **Plain text, owned forever** — markdown in git; no platform lock-in.
+3. **Same shape per area** — README (dashboard) / goals / tasks, everywhere.
+4. **Private means encrypted** — not "hidden", not "obscure". Encrypted.
+5. **Review cadence beats fancy tooling** — weekly review Sundays, daily glance
+   at `NOW.md`.

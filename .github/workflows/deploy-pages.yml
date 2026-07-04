@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, claude/luinus-control-center-arj64r]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -29,10 +29,13 @@ jobs:
         with:
           enablement: true
 
+      # Deploy ONLY the Luinus dashboard app. Never widen this path:
+      # the rest of the repo is Gustavo's personal control center and
+      # must not be published to the public Pages site.
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: 'luinus/dashboard'
 
       - name: Deploy to GitHub Pages
         id: deployment
