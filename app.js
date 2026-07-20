@@ -1,45 +1,44 @@
-/* Luinus Company Control Center — application logic
- * Vanilla JS SPA. No build step. State persists to localStorage and can be
- * swapped for real agent telemetry later (see data.js for the shape).
+/* Luinus Growth Engine — application logic
+ * Vanilla JS SPA, no build step. Focused on automated outreach:
+ * leads → copy → email/LinkedIn at volume → replies → booked demos.
+ * State persists to localStorage; swap SEED in data.js for live data later.
  */
 
 'use strict';
 
-const STORAGE_KEY = 'luinus-control-center:v2';
-const STAGES = [
-  { id: 'backlog', label: 'Backlog', hint: 'Queued' },
-  { id: 'in_progress', label: 'In Progress', hint: 'Working 24/7' },
-  { id: 'blocked', label: 'Blocked', hint: 'Needs unblock' },
-  { id: 'review', label: 'Review / QA', hint: 'Gatekeeping' },
-  { id: 'shipped', label: 'Shipped', hint: 'Done' },
+const STORAGE_KEY = 'luinus-growth-engine:v1';
+const PIPELINE = [
+  { id: 'sourced', label: 'Sourced' },
+  { id: 'contacted', label: 'Contacted' },
+  { id: 'replied', label: 'Replied' },
+  { id: 'booked', label: 'Booked' },
+  { id: 'won', label: 'Won' },
+  { id: 'passed', label: 'Passed' },
 ];
 const VIEWS = {
-  mission: { title: 'Mission Control', sub: 'What the company is doing right now — and what needs your call.' },
-  kanban: { title: 'Kanban Board', sub: 'Every goal the agents are working, 24/7. Drag a card to move it.' },
-  agents: { title: 'Agents', sub: 'The roster. Each card is actionable — open one for the full picture.' },
-  queue: { title: 'Execution Queue', sub: 'Prioritized work. Sort, filter, and drive items to done.' },
-  decisions: { title: 'Founder Decisions', sub: 'The CEO inbox. Only the calls that genuinely need you.' },
-  alerts: { title: 'Alerts & Blockers', sub: 'What is stuck, stale, or risky. Hard to miss, never noisy.' },
-  souls: { title: 'Agent Souls', sub: 'The operating contract each agent carries into every run.' },
+  command: { title: 'Command', sub: "Tell the team what to do — and see what's already working." },
+  campaigns: { title: 'Campaigns', sub: 'Every outreach campaign the team is running, 24/7.' },
+  pipeline: { title: 'Pipeline', sub: 'Every doctor in motion — drag a card as it progresses.' },
+  inbox: { title: 'Inbox', sub: 'Replies and approvals that need a human. Clear these first.' },
+  playbooks: { title: 'Playbooks', sub: 'Proven outreach plays. Deploy one as a campaign in a click.' },
+  team: { title: 'Teams', sub: 'Switch between teams. Each agent is actionable.' },
+  souls: { title: 'Souls', sub: 'The operating contract each agent carries into every run.' },
 };
 
 let state = loadState();
-let currentView = 'mission';
-let queueFilter = 'all';
+let currentView = 'command';
+let activeTeam = (state.teams && state.teams[0] && state.teams[0].id) || 'outreach';
+let composerText = '';
 let autopilotTimer = null;
 let clockTimer = null;
 
 const $ = (id) => document.getElementById(id);
 const dom = {
-  views: {
-    mission: $('view-mission'), kanban: $('view-kanban'), agents: $('view-agents'),
-    queue: $('view-queue'), decisions: $('view-decisions'), alerts: $('view-alerts'), souls: $('view-souls'),
-  },
+  views: Object.fromEntries(Object.keys(VIEWS).map((k) => [k, $('view-' + k)])),
   viewTitle: $('viewTitle'), viewSubtitle: $('viewSubtitle'),
-  nav: $('nav'), navDecisions: $('navDecisions'), navAlerts: $('navAlerts'),
+  nav: $('nav'), navCampaigns: $('navCampaigns'), navInbox: $('navInbox'),
   autopilotToggle: $('autopilotToggle'), autopilotSub: $('autopilotSub'),
-  cadencePill: $('cadencePill'), clockPill: $('clockPill'),
-  sidebarStatus: $('sidebarStatus'),
+  clockPill: $('clockPill'), sidebarStatus: $('sidebarStatus'),
   refreshBtn: $('refreshBtn'), exportBtn: $('exportBtn'),
   drawer: $('drawer'), drawerInner: $('drawerInner'), drawerBackdrop: $('drawerBackdrop'),
   toast: $('toast'),
@@ -48,41 +47,27 @@ const dom = {
 init();
 
 function init() {
-  bindGlobalActions();
-  setView(location.hash.replace('#', '') || 'mission');
+  bindGlobal();
+  setView(location.hash.replace('#', '') || 'command');
   startClock();
   if (state.meta.autopilot) startAutopilot(true);
   syncAutopilotUI();
 }
 
-/* ------------------------------------------------------------------ state */
+/* --------------------------------------------------------------- state */
 function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (_) {}
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw); } catch (_) {}
   return structuredClone(window.LUINUS_SEED);
 }
-function save() {
-  state.meta.lastRefresh = new Date().toISOString();
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) {}
-}
-function rerender() { renderCurrentView(); renderChrome(); }
-function commit() { save(); rerender(); }
-
-function resetState() {
-  state = structuredClone(window.LUINUS_SEED);
-  state.meta.startedAt = new Date().toISOString();
-  commit();
-  toast('State reset to seed.');
-}
+function save() { state.meta.lastRefresh = new Date().toISOString(); try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) {} }
+function commit() { save(); renderCurrentView(); renderChrome(); }
 
 /* --------------------------------------------------------------- routing */
 function setView(name) {
-  if (!VIEWS[name]) name = 'mission';
+  if (!VIEWS[name]) name = 'command';
   currentView = name;
   location.hash = name;
-  Object.entries(dom.views).forEach(([k, elv]) => elv.classList.toggle('active', k === name));
+  Object.entries(dom.views).forEach(([k, el]) => el.classList.toggle('active', k === name));
   dom.nav.querySelectorAll('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
   dom.viewTitle.textContent = VIEWS[name].title;
   dom.viewSubtitle.textContent = VIEWS[name].sub;
@@ -90,76 +75,87 @@ function setView(name) {
   renderChrome();
   dom.views[name].parentElement.scrollTop = 0;
 }
-
 function renderCurrentView() {
-  ({
-    mission: renderMission, kanban: renderKanban, agents: renderAgents,
-    queue: renderQueue, decisions: renderDecisions, alerts: renderAlerts, souls: renderSouls,
-  })[currentView]();
+  ({ command: renderCommand, campaigns: renderCampaigns, pipeline: renderPipeline,
+     inbox: renderInbox, playbooks: renderPlaybooks, team: renderTeam, souls: renderSouls })[currentView]();
 }
 
 /* --------------------------------------------------------------- metrics */
 function metrics() {
-  const a = state.agents, t = state.tasks;
-  const shipped = t.filter((x) => x.stage === 'shipped').length;
-  const open = t.filter((x) => x.stage !== 'shipped').length;
-  const critical = t.filter((x) => x.priority === 'P0' && x.stage !== 'shipped').length;
-  const blockedTasks = t.filter((x) => x.stage === 'blocked').length;
-  const timeSaved = (shipped * 3.5 + a.reduce((s, x) => s + x.progress, 0) / 100 * 1.6).toFixed(1);
+  const live = state.campaigns.filter((c) => c.status === 'live');
+  const emailsToday = sum(live.filter((c) => c.channel === 'email').map((c) => c.sentToday));
+  const dmsToday = sum(live.filter((c) => c.channel === 'linkedin').map((c) => c.sentToday));
+  const totalSent = sum(state.campaigns.map((c) => c.totalSent));
+  const replies = sum(state.campaigns.map((c) => c.replies));
+  const booked = sum(state.campaigns.map((c) => c.booked));
+  const won = state.leads.filter((l) => l.stage === 'won').length;
   return {
-    active: a.filter((x) => x.status === 'live').length,
-    blocked: a.filter((x) => x.status === 'blocked').length,
-    idle: a.filter((x) => x.status === 'idle').length,
-    waiting: a.filter((x) => x.status === 'waiting').length,
-    total: a.length,
-    openDecisions: state.decisions.filter((d) => d.status === 'open').length,
-    openTasks: open, critical, shipped, blockedTasks,
-    risks: state.alerts.filter((x) => x.severity === 'critical').length,
-    timeSaved,
+    emailsToday, dmsToday, totalSent, replies, booked, won,
+    replyRate: totalSent ? (replies / totalSent * 100) : 0,
+    activeCampaigns: live.length,
+    openApprovals: state.inbox.filter((i) => i.status === 'open').length,
+    leadsInPlay: state.leads.filter((l) => !['won', 'passed'].includes(l.stage)).length,
   };
 }
 
-function recommendation() {
+function nextAction() {
   const m = metrics();
-  const pricing = state.decisions.find((d) => d.id === 'd1' && d.status === 'open');
-  if (m.risks > 0) {
-    const al = state.alerts.find((x) => x.severity === 'critical');
-    return { label: 'Highest-leverage move', text: al.title, detail: al.detail, go: () => setView('alerts') };
-  }
-  if (pricing) return { label: 'Unblock revenue', text: 'Resolve pilot pricing', detail: 'Sales is blocked until this is your call. Decide it and the Otero follow-up moves.', go: () => setView('decisions') };
-  if (m.blocked > 0) return { label: 'Clear a blocker', text: `${m.blocked} agent(s) blocked`, detail: 'A blocked lane is the first priority every cycle.', go: () => setView('agents') };
-  if (m.openDecisions > 0) return { label: 'Make the call', text: `${m.openDecisions} decision(s) waiting`, detail: 'Resolve these so the lanes can keep moving.', go: () => setView('decisions') };
-  return { label: 'Momentum', text: 'Company is flowing', detail: 'No blockers and no open decisions. Push the next P0 to shipped.', go: () => setView('kanban') };
+  const hot = state.inbox.find((i) => i.status === 'open' && i.urgency === 'high');
+  if (hot) return { label: 'Needs you now', text: hot.title, detail: hot.detail, go: () => setView('inbox') };
+  const copy = state.inbox.find((i) => i.status === 'open' && i.type === 'approve-copy');
+  if (copy) return { label: 'Unblock a launch', text: copy.title, detail: copy.detail, go: () => setView('inbox') };
+  if (m.openApprovals) return { label: 'Clear the inbox', text: `${m.openApprovals} item(s) waiting`, detail: 'Approve replies and copy so the team keeps moving.', go: () => setView('inbox') };
+  const draft = state.campaigns.find((c) => c.status === 'draft');
+  if (draft) return { label: 'Launch more volume', text: `“${draft.name}” is ready`, detail: 'Approve and launch it to add outbound volume.', go: () => setView('campaigns') };
+  return { label: 'Momentum', text: 'Outreach is flowing', detail: 'Inbox is clear. Tell the team to scale a winning campaign.', go: () => setView('command') };
 }
 
 /* --------------------------------------------------------------- chrome */
 function renderChrome() {
   const m = metrics();
-  dom.navDecisions.textContent = m.openDecisions || '';
-  dom.navDecisions.style.display = m.openDecisions ? '' : 'none';
-  dom.navAlerts.textContent = m.risks || '';
-  dom.navAlerts.style.display = m.risks ? '' : 'none';
-  dom.cadencePill.textContent = `Loop · ${state.meta.cadence}`;
-  dom.sidebarStatus.textContent = state.meta.autopilot ? 'Autopilot running' : 'Company live · seeded state';
+  dom.navCampaigns.textContent = m.activeCampaigns || '';
+  dom.navCampaigns.style.display = m.activeCampaigns ? '' : 'none';
+  dom.navInbox.textContent = m.openApprovals || '';
+  dom.navInbox.style.display = m.openApprovals ? '' : 'none';
+  dom.sidebarStatus.textContent = state.meta.autopilot ? 'Autopilot running' : 'Outreach live · seeded';
 }
 
 /* ===================================================================== */
-/*  VIEW: MISSION CONTROL                                                  */
+/*  VIEW: COMMAND                                                          */
 /* ===================================================================== */
-function renderMission() {
+function renderCommand() {
   const m = metrics();
-  const rec = recommendation();
+  const g = state.meta.goals;
+  const rec = nextAction();
   const tiles = [
-    tile('Agents live', `${m.active}/${m.total}`, 'tone-good', `${m.idle} idle · ${m.waiting} waiting`),
-    tile('Blocked lanes', String(m.blocked), m.blocked ? 'tone-bad' : 'tone-good', 'Need founder or COO'),
-    tile('Open decisions', String(m.openDecisions), m.openDecisions ? 'tone-warn' : 'tone-good', 'Your call'),
-    tile('Critical tasks', String(m.critical), m.critical ? 'tone-bad' : 'tone-good', 'P0 in flight'),
-    tile('Shipped', String(m.shipped), 'tone-info', 'Throughput'),
-    tile('Time saved', `${m.timeSaved}h`, 'tone-info', 'Est. this run'),
+    goalTile('Emails sent today', m.emailsToday, g.emailsPerDay, 'tone-info'),
+    goalTile('DMs sent today', m.dmsToday, g.dmsPerDay, 'tone-good'),
+    statTile('Replies', m.replies, `${m.replyRate.toFixed(1)}% reply rate`, 'tone-good'),
+    statTile('Demos booked', m.booked, `${m.won} won`, 'tone-warn'),
+    statTile('In pipeline', m.leadsInPlay, 'leads in motion', 'tone-info'),
   ].join('');
 
-  dom.views.mission.innerHTML = `
-    <div class="metrics-row">${tiles}</div>
+  dom.views.command.innerHTML = `
+    <section class="composer">
+      <div class="composer-head">
+        <span class="eyebrow">Tell the team what to do</span>
+        <span class="subtle">Plain English. The right agent picks it up.</span>
+      </div>
+      <textarea id="composerInput" class="composer-input" rows="2" placeholder="e.g. Send 1,000 cold emails to ER physicians in Texas">${esc(composerText)}</textarea>
+      <div class="composer-chips" id="composerChips">
+        ${chip('Send 1,000 cold emails to ER physicians')}
+        ${chip('Send 100 LinkedIn DMs to Medical Directors')}
+        ${chip('Find 300 new doctor leads in California')}
+        ${chip('Write a 4-step cold email sequence for hospitalists')}
+        ${chip('Draft a founder post about ER documentation pain')}
+      </div>
+      <div class="composer-foot">
+        <span class="subtle" id="composerHint">${esc(previewInstruction(composerText))}</span>
+        <button class="btn btn-primary" data-act="composer-send">Send to team →</button>
+      </div>
+    </section>
+
+    <div class="metrics-row five">${tiles}</div>
 
     <button class="recommend" data-act="rec-go">
       <div class="recommend-left">
@@ -172,288 +168,376 @@ function renderMission() {
 
     <div class="mission-grid">
       <section class="panel">
-        <div class="panel-head">
-          <div><span class="eyebrow">CEO inbox</span><h3>What still needs your call</h3></div>
-          <button class="link" data-act="goto" data-view="decisions">View all</button>
-        </div>
-        <div class="stack">${decisionsHTML(state.decisions.filter((d) => d.status === 'open').slice(0, 3), true)}</div>
+        <div class="panel-head"><div><span class="eyebrow">Needs you</span><h3>Inbox</h3></div>
+          <button class="link" data-act="goto" data-view="inbox">View all</button></div>
+        <div class="stack">${state.inbox.filter((i) => i.status === 'open').slice(0, 3).map(inboxRow).join('') || '<div class="kcol-empty">Inbox zero — nothing waiting on you.</div>'}</div>
       </section>
-
       <section class="panel">
-        <div class="panel-head">
-          <div><span class="eyebrow">Risk radar</span><h3>Alerts & blockers</h3></div>
-          <button class="link" data-act="goto" data-view="alerts">View all</button>
-        </div>
-        <div class="stack">${alertsHTML(state.alerts.slice(0, 4))}</div>
+        <div class="panel-head"><div><span class="eyebrow">Running now</span><h3>Live campaigns</h3></div>
+          <button class="link" data-act="goto" data-view="campaigns">View all</button></div>
+        <div class="stack">${state.campaigns.filter((c) => c.status !== 'draft').slice(0, 3).map(campaignMini).join('')}</div>
       </section>
-
-      <section class="panel pulse-panel">
-        <div class="panel-head"><div><span class="eyebrow">Company pulse</span><h3>Lane status</h3></div></div>
-        <div class="pulse">${pulseHTML()}</div>
-      </section>
-
       <section class="panel activity-panel">
-        <div class="panel-head">
-          <div><span class="eyebrow">Audit trail</span><h3>Activity stream</h3></div>
-          <span class="subtle">${state.activity.length} recent</span>
-        </div>
+        <div class="panel-head"><div><span class="eyebrow">Audit trail</span><h3>Activity</h3></div>
+          <span class="subtle">${state.activity.length} recent</span></div>
         <div class="activity">${activityHTML(state.activity.slice(0, 8))}</div>
       </section>
     </div>`;
+
+  const input = $('composerInput');
+  input.addEventListener('input', (e) => { composerText = e.target.value; $('composerHint').textContent = previewInstruction(composerText); });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitComposer(); });
 }
 
-function pulseHTML() {
-  return state.agents.map((ag) => `
-    <button class="pulse-chip ${ag.status}" data-act="open-agent" data-id="${ag.id}" title="${esc(ag.mission)}">
-      <span class="avatar">${initials(ag.codename)}</span>
-      <span class="pulse-meta">
-        <span class="pulse-name">${esc(ag.codename)}</span>
-        <span class="pulse-status">${statusLabel(ag.status)}</span>
-      </span>
-      <span class="dot ${ag.status}"></span>
-    </button>`).join('');
+function campaignMini(c) {
+  const pct = c.goalPerDay ? Math.min(100, Math.round(c.sentToday / c.goalPerDay * 100)) : 0;
+  return `<button class="cmini" data-act="open-campaign" data-id="${c.id}">
+    <div class="cmini-top"><span class="ch-badge ${c.channel}">${channelIcon(c.channel)}</span><strong>${esc(c.name)}</strong><span class="status-chip st-${c.status}">${c.status}</span></div>
+    <div class="goal-bar"><span style="width:${pct}%"></span></div>
+    <div class="cmini-meta"><span>${c.sentToday}/${c.goalPerDay || '—'} today</span><span>${c.replies} replies · ${c.booked} booked</span></div>
+  </button>`;
 }
 
 /* ===================================================================== */
-/*  VIEW: KANBAN                                                           */
+/*  COMPOSER — turn plain English into work                               */
 /* ===================================================================== */
-function renderKanban() {
-  const cols = STAGES.map((s) => {
-    const items = state.tasks.filter((t) => t.stage === s.id);
-    return `
-      <div class="kcol" data-stage="${s.id}">
-        <div class="kcol-head">
-          <div class="kcol-title"><span class="kcol-dot st-${s.id}"></span>${s.label}</div>
-          <span class="kcol-count">${items.length}</span>
-        </div>
-        <div class="kcol-hint">${s.hint}</div>
-        <div class="kcol-body" data-stage="${s.id}">
-          ${items.map(kanbanCard).join('') || `<div class="kcol-empty">Nothing here</div>`}
-        </div>
-      </div>`;
-  }).join('');
+function parseInstruction(text) {
+  const t = (text || '').toLowerCase().trim();
+  if (!t) return null;
+  const num = (t.match(/[\d,]+/) || [])[0];
+  const count = num ? parseInt(num.replace(/,/g, ''), 10) : null;
+  const target = (text.match(/(?:to|for|of)\s+(.+)$/i) || [])[1];
+  const icp = target ? target.replace(/[.]+$/, '').trim() : 'your ICP';
 
-  dom.views.kanban.innerHTML = `
-    <div class="kanban-bar">
-      <span class="subtle">Drag cards across stages, or use a card's menu. Agents keep these moving on Autopilot.</span>
-      <button class="btn btn-ghost btn-small" data-act="advance">⏩ Advance company cycle</button>
-    </div>
-    <div class="kanban">${cols}</div>`;
+  let intent;
+  if (/\b(dm|dms|linkedin|connect|message)\b/.test(t)) intent = 'linkedin';
+  else if (/\b(email|emails|cold email|inbox|mail)\b/.test(t)) intent = 'email';
+  else if (/\b(find|source|leads|list|build|prospect)\b/.test(t)) intent = 'leads';
+  else if (/\b(write|copy|sequence|draft|subject)\b/.test(t) && /\b(post|content)\b/.test(t) === false) intent = 'copy';
+  else if (/\b(post|content)\b/.test(t)) intent = 'content';
+  else intent = 'email';
 
-  wireKanbanDnD();
+  return { intent, count, icp };
 }
 
-function kanbanCard(t) {
-  const ag = agentById(t.owner);
-  const overdue = t.stage !== 'shipped' && t.dueIn <= 1;
+function previewInstruction(text) {
+  const p = parseInstruction(text);
+  if (!p) return 'The right agent will pick it up.';
+  const map = {
+    email: `→ Mailer: new email campaign${p.count ? ` (${p.count}/day)` : ''} to ${p.icp}`,
+    linkedin: `→ Connector: new LinkedIn campaign${p.count ? ` (${p.count}/day)` : ''} to ${p.icp}`,
+    leads: `→ Scout: source${p.count ? ` ${p.count}` : ''} leads (${p.icp})`,
+    copy: `→ Scribe: draft a sequence for ${p.icp}`,
+    content: `→ Pulse: draft founder content (${p.icp})`,
+  };
+  return map[p.intent];
+}
+
+function submitComposer() {
+  const p = parseInstruction(composerText);
+  if (!p) { toast('Type an instruction first.'); return; }
+  const raw = composerText.trim();
+
+  if (p.intent === 'email' || p.intent === 'linkedin') {
+    const owner = p.intent === 'email' ? 'mailer' : 'connector';
+    const goal = p.count || (p.intent === 'email' ? 500 : 80);
+    const c = {
+      id: 'c' + Date.now(), name: titleCase(`${p.icp} — ${p.intent === 'email' ? 'Cold Email' : 'LinkedIn'}`),
+      channel: p.intent, owner, icp: titleCase(p.icp), goalPerDay: goal,
+      status: p.intent === 'email' ? 'warming' : 'draft',
+      sentToday: 0, totalSent: 0, replies: 0, booked: 0,
+      infra: p.intent === 'email' ? { domains: Math.max(1, Math.ceil(goal / 100)), inboxes: Math.max(1, Math.ceil(goal / 20)), warmDaysLeft: 14 } : null,
+      steps: p.intent === 'email'
+        ? [{ day: 1, type: 'email', label: 'Pain + benefit' }, { day: 3, type: 'email', label: 'Proof' }, { day: 6, type: 'email', label: 'Bump' }, { day: 10, type: 'email', label: 'Breakup' }]
+        : [{ day: 0, type: 'engage', label: 'Pre-engage' }, { day: 2, type: 'connect', label: 'Connect + note' }, { day: 3, type: 'dm', label: 'Value DM' }, { day: 6, type: 'dm', label: 'Follow-up' }],
+      createdAt: new Date().toISOString(),
+    };
+    state.campaigns.unshift(c);
+    state.inbox.unshift({ id: 'i' + Date.now(), type: 'approve-copy', title: `Approve copy for “${c.name}”`, detail: `Scribe will draft the ${p.intent === 'email' ? 'email' : 'DM'} sequence. Approve to ${p.intent === 'email' ? 'launch once warmed' : 'launch'}.`, campaignId: c.id, urgency: 'medium', status: 'open' });
+    pushActivity(actorOf(owner), `New ${p.intent === 'email' ? 'email' : 'LinkedIn'} campaign created: ${c.name} (${goal}/day).`, p.intent === 'email' ? 'email' : 'linkedin');
+    pushActivity(actorOf('scribe'), `Drafting the sequence for ${c.name}.`, 'copy');
+    composerText = '';
+    commit(); toast('Campaign created → see Campaigns.'); setView('campaigns');
+    return;
+  }
+
+  if (p.intent === 'leads') {
+    const ag = agent('scout'); ag.status = 'live'; ag.lastRun = now();
+    ag.next = `Source ${p.count || 'new'} leads (${titleCase(p.icp)}) and verify.`;
+    state.inbox.unshift({ id: 'i' + Date.now(), type: 'approve-leads', title: `Approve ${p.count || 'sourced'} leads (${titleCase(p.icp)})`, detail: 'Scout will source + bounce-check. Approve to load into a campaign.', urgency: 'medium', status: 'open' });
+    pushActivity(actorOf('scout'), `Sourcing ${p.count || 'new'} leads: ${titleCase(p.icp)}.`, 'leads');
+  } else if (p.intent === 'copy') {
+    const ag = agent('scribe'); ag.status = 'live'; ag.lastRun = now();
+    ag.next = `Draft a sequence for ${titleCase(p.icp)}.`;
+    state.inbox.unshift({ id: 'i' + Date.now(), type: 'approve-copy', title: `Approve sequence copy (${titleCase(p.icp)})`, detail: 'Scribe drafted a sequence. Approve to use it.', urgency: 'medium', status: 'open' });
+    pushActivity(actorOf('scribe'), `Drafting a sequence for ${titleCase(p.icp)}.`, 'copy');
+  } else { // content
+    const ag = agent('pulse'); ag.status = 'live'; ag.lastRun = now();
+    ag.next = `Draft founder content: ${titleCase(p.icp)}.`;
+    pushActivity(actorOf('pulse'), `Drafting founder content: ${raw}.`, 'marketing');
+  }
+  composerText = '';
+  commit(); toast('Sent to the team → see Inbox.'); setView('inbox');
+}
+
+/* ===================================================================== */
+/*  VIEW: CAMPAIGNS                                                        */
+/* ===================================================================== */
+function renderCampaigns() {
+  dom.views.campaigns.innerHTML = `<div class="campaign-grid">${state.campaigns.map(campaignCard).join('')}</div>`;
+}
+
+function campaignCard(c) {
+  const pct = c.goalPerDay ? Math.min(100, Math.round(c.sentToday / c.goalPerDay * 100)) : 0;
+  const rate = c.totalSent ? (c.replies / c.totalSent * 100).toFixed(1) : '0.0';
   return `
-    <article class="kcard ${t.stage === 'shipped' ? 'is-done' : ''}" draggable="true" data-task-id="${t.id}" data-act="open-task" data-id="${t.id}">
-      <div class="kcard-top">
-        <span class="ptag p${t.priority[1]}">${t.priority}</span>
-        ${overdue ? `<span class="due-flag">${t.dueIn <= 0 ? 'due' : 'due soon'}</span>` : `<span class="due-soft">${t.dueIn}d</span>`}
+    <article class="campaign">
+      <div class="campaign-top">
+        <button class="campaign-id" data-act="open-campaign" data-id="${c.id}">
+          <span class="ch-badge ${c.channel}">${channelIcon(c.channel)}</span>
+          <span><span class="campaign-name">${esc(c.name)}</span><span class="campaign-icp">${esc(c.icp)}</span></span>
+        </button>
+        <span class="status-chip st-${c.status}">${c.status}</span>
       </div>
-      <div class="kcard-title">${esc(t.title)}</div>
-      <div class="kcard-detail">${esc(t.detail)}</div>
-      ${t.deps && t.deps.length ? `<div class="kcard-dep">⛓ ${esc(t.deps.join(', '))}</div>` : ''}
-      <div class="kcard-foot">
-        <span class="owner"><span class="avatar xs">${ag ? initials(ag.codename) : '?'}</span>${ag ? esc(ag.codename) : t.owner}</span>
-        <span class="lane-chip">${esc(t.lane)}</span>
+      ${c.status === 'warming' && c.infra ? `<div class="warming-note">🔥 Warming inboxes — ${c.infra.warmDaysLeft} days left before sending</div>` : ''}
+      <div class="goal-row">
+        <span>${c.sentToday}/${c.goalPerDay || '—'} sent today</span><span>${pct}%</span>
+      </div>
+      <div class="goal-bar"><span style="width:${pct}%"></span></div>
+      <div class="campaign-stats">
+        <div><b>${c.totalSent}</b><span>total sent</span></div>
+        <div><b>${c.replies}</b><span>replies</span></div>
+        <div><b>${c.booked}</b><span>booked</span></div>
+        <div><b>${rate}%</b><span>reply rate</span></div>
+      </div>
+      ${c.infra ? `<div class="infra-note">📮 ${c.infra.domains} domains · ${c.infra.inboxes} inboxes · ~${Math.round((c.goalPerDay || 0) / Math.max(1, c.infra.inboxes))}/inbox/day</div>` : ''}
+      <div class="campaign-actions">
+        ${c.status === 'live'
+          ? `<button class="btn btn-ghost btn-small" data-act="campaign" data-op="pause" data-id="${c.id}">Pause</button>`
+          : `<button class="btn btn-primary btn-small" data-act="campaign" data-op="start" data-id="${c.id}">${c.status === 'warming' ? 'Skip warmup & launch' : 'Launch'}</button>`}
+        <button class="btn btn-ghost btn-small" data-act="open-campaign" data-id="${c.id}">Details</button>
       </div>
     </article>`;
 }
 
-function wireKanbanDnD() {
+/* ===================================================================== */
+/*  VIEW: PIPELINE (kanban of leads)                                      */
+/* ===================================================================== */
+function renderPipeline() {
+  const cols = PIPELINE.map((s) => {
+    const items = state.leads.filter((l) => l.stage === s.id);
+    return `
+      <div class="kcol" data-stage="${s.id}">
+        <div class="kcol-head"><div class="kcol-title"><span class="kcol-dot pst-${s.id}"></span>${s.label}</div><span class="kcol-count">${items.length}</span></div>
+        <div class="kcol-body" data-stage="${s.id}">${items.map(leadCard).join('') || '<div class="kcol-empty">—</div>'}</div>
+      </div>`;
+  }).join('');
+  dom.views.pipeline.innerHTML = `
+    <div class="kanban-bar"><span class="subtle">Drag a doctor across stages, or open a card. The team keeps these moving on Autopilot.</span></div>
+    <div class="kanban six">${cols}</div>`;
+  wirePipelineDnD();
+}
+
+function leadCard(l) {
+  return `
+    <article class="kcard lead" draggable="true" data-lead-id="${l.id}" data-act="open-lead" data-id="${l.id}">
+      <div class="kcard-top"><strong>${esc(l.name)}</strong><span class="ch-badge sm ${l.channel}">${channelIcon(l.channel)}</span></div>
+      <div class="lead-title">${esc(l.title)} · ${esc(l.specialty)}</div>
+      <div class="lead-org">${esc(l.org)} · ${esc(l.geo)}</div>
+      ${l.note ? `<div class="kcard-detail">${esc(l.note)}</div>` : ''}
+    </article>`;
+}
+
+function wirePipelineDnD() {
   let dragId = null;
-  dom.views.kanban.querySelectorAll('.kcard').forEach((card) => {
-    card.addEventListener('dragstart', (e) => {
-      dragId = card.dataset.taskId;
-      card.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', dragId);
-    });
+  dom.views.pipeline.querySelectorAll('.kcard').forEach((card) => {
+    card.addEventListener('dragstart', (e) => { dragId = card.dataset.leadId; card.classList.add('dragging'); e.dataTransfer.setData('text/plain', dragId); });
     card.addEventListener('dragend', () => { card.classList.remove('dragging'); dragId = null; });
   });
-  dom.views.kanban.querySelectorAll('.kcol-body').forEach((body) => {
+  dom.views.pipeline.querySelectorAll('.kcol-body').forEach((body) => {
     body.addEventListener('dragover', (e) => { e.preventDefault(); body.classList.add('drop-hot'); });
     body.addEventListener('dragleave', () => body.classList.remove('drop-hot'));
-    body.addEventListener('drop', (e) => {
-      e.preventDefault();
-      body.classList.remove('drop-hot');
-      const id = dragId || e.dataTransfer.getData('text/plain');
-      moveTaskStage(id, body.dataset.stage);
-    });
+    body.addEventListener('drop', (e) => { e.preventDefault(); body.classList.remove('drop-hot'); moveLead(dragId || e.dataTransfer.getData('text/plain'), body.dataset.stage); });
   });
 }
 
-function moveTaskStage(id, stage) {
-  const t = state.tasks.find((x) => x.id === id);
-  if (!t || t.stage === stage) return;
-  const from = t.stage;
-  t.stage = stage;
-  if (stage === 'shipped') { t.priority = t.priority; }
-  pushActivity(systemActor(), `Task moved ${stageLabel(from)} → ${stageLabel(stage)}: ${t.title}.`, t.lane.toLowerCase());
-  reconcileAlerts();
+function moveLead(id, stage) {
+  const l = state.leads.find((x) => x.id === id);
+  if (!l || l.stage === stage) return;
+  const from = l.stage; l.stage = stage;
+  pushActivity(actorOf('closer'), `${l.name} moved ${stageLabel(from)} → ${stageLabel(stage)}.`, 'pipeline');
+  commit(); toast(`${l.name} → ${stageLabel(stage)}`);
+}
+
+/* ===================================================================== */
+/*  VIEW: INBOX                                                            */
+/* ===================================================================== */
+function renderInbox() {
+  const open = state.inbox.filter((i) => i.status === 'open');
+  const done = state.inbox.filter((i) => i.status !== 'open');
+  dom.views.inbox.innerHTML = `
+    <div class="stack wide">${open.map(inboxCard).join('') || '<div class="kcol-empty">Inbox zero. Nothing needs you right now.</div>'}</div>
+    ${done.length ? `<div class="closed-head"><span class="eyebrow">Cleared (${done.length})</span></div>
+      <div class="stack wide muted">${done.map((i) => `<article class="decision closed"><div class="decision-head"><strong>${esc(i.title)}</strong><span class="resolved-tag">${i.status}</span></div></article>`).join('')}</div>` : ''}`;
+}
+
+function inboxRow(i) {
+  return `<button class="inbox-row" data-act="goto" data-view="inbox">
+    <span class="itype it-${i.type}">${inboxLabel(i.type)}</span>
+    <span class="inbox-row-title">${esc(i.title)}</span>
+    <span class="urgency-tag ${i.urgency}">${i.urgency}</span>
+  </button>`;
+}
+
+function inboxCard(i) {
+  const actions = {
+    reply: `<button class="btn btn-primary btn-small" data-act="inbox" data-op="approve" data-id="${i.id}">Approve & send</button>
+            <button class="btn btn-ghost btn-small" data-act="inbox" data-op="skip" data-id="${i.id}">Skip</button>`,
+    objection: `<button class="btn btn-primary btn-small" data-act="inbox" data-op="approve" data-id="${i.id}">Approve answer</button>
+                <button class="btn btn-ghost btn-small warn" data-act="inbox" data-op="skip" data-id="${i.id}">Hold</button>`,
+    'approve-copy': `<button class="btn btn-primary btn-small" data-act="inbox" data-op="approve" data-id="${i.id}">Approve copy</button>
+                     <button class="btn btn-ghost btn-small" data-act="inbox" data-op="skip" data-id="${i.id}">Send back</button>`,
+    'approve-leads': `<button class="btn btn-primary btn-small" data-act="inbox" data-op="approve" data-id="${i.id}">Approve leads</button>
+                      <button class="btn btn-ghost btn-small warn" data-act="inbox" data-op="skip" data-id="${i.id}">Reject</button>`,
+    book: `<button class="btn btn-primary btn-small" data-act="inbox" data-op="approve" data-id="${i.id}">Confirm & book</button>
+           <button class="btn btn-ghost btn-small" data-act="inbox" data-op="skip" data-id="${i.id}">Hold</button>`,
+  }[i.type];
+  return `
+    <article class="inbox-card urgency-${i.urgency}">
+      <div class="inbox-card-head">
+        <span class="itype it-${i.type}">${inboxLabel(i.type)}</span>
+        <strong>${esc(i.title)}</strong>
+        <span class="urgency-tag ${i.urgency}">${i.urgency}</span>
+      </div>
+      <p>${esc(i.detail)}</p>
+      <div class="decision-actions">${actions}</div>
+    </article>`;
+}
+
+function inboxAction(id, op) {
+  const i = state.inbox.find((x) => x.id === id);
+  if (!i) return;
+  if (op === 'skip') {
+    i.status = i.type === 'approve-leads' ? 'rejected' : i.type === 'approve-copy' ? 'sent back' : 'held';
+    pushActivity(actorOf('closer'), `${i.title} — ${i.status}.`, 'pipeline');
+  } else {
+    i.status = 'approved';
+    // Side effects that move the business forward.
+    if (i.type === 'reply' && i.leadId) { const l = lead(i.leadId); if (l && l.stage === 'replied') { /* keep */ } pushActivity(actorOf('closer'), `Sent the approved reply to ${l ? l.name : 'lead'}.`, 'pipeline'); }
+    if (i.type === 'objection' && i.leadId) { const l = lead(i.leadId); pushActivity(actorOf('closer'), `Answered ${l ? l.name : 'the'} objection (compliance) — back in play.`, 'pipeline'); if (l && l.stage === 'contacted') l.stage = 'replied'; }
+    if (i.type === 'book' && i.leadId) { const l = lead(i.leadId); if (l) l.stage = 'booked'; const c = camp(l && l.campaignId); if (c) c.booked++; pushActivity(actorOf('closer'), `Booked a demo with ${l ? l.name : 'lead'}.`, 'pipeline'); unblockAgent('closer'); }
+    if (i.type === 'approve-copy') { const c = camp(i.campaignId); if (c && c.status === 'draft') c.status = 'warming'; pushActivity(actorOf('scribe'), `Copy approved${c ? ` for ${c.name}` : ''} — ready to send.`, 'copy'); }
+    if (i.type === 'approve-leads') {
+      const c = camp(i.campaignId);
+      // Drop a couple fresh leads into the pipeline.
+      for (let k = 0; k < 2; k++) state.leads.push(freshLead(c));
+      pushActivity(actorOf('scout'), `Leads approved — loaded into the pipeline.`, 'leads');
+    }
+    unblockAgent('closer');
+  }
   commit();
-  toast(`“${t.title}” → ${stageLabel(stage)}`);
+  toast(op === 'skip' ? 'Done.' : 'Approved.');
 }
 
 /* ===================================================================== */
-/*  VIEW: AGENTS                                                           */
+/*  VIEW: PLAYBOOKS                                                        */
 /* ===================================================================== */
-function renderAgents() {
-  dom.views.agents.innerHTML = `<div class="agent-grid">${state.agents.map(agentCard).join('')}</div>`;
+function renderPlaybooks() {
+  dom.views.playbooks.innerHTML = `<div class="soul-grid">${state.playbooks.map(playbookCard).join('')}</div>`;
+}
+function playbookCard(p) {
+  return `
+    <article class="soul playbook">
+      <div class="soul-head">
+        <span class="ch-badge ${p.channel}">${channelIcon(p.channel)}</span>
+        <div><div class="soul-name">${esc(p.title)}</div><div class="soul-tagline">${esc(p.summary)}</div></div>
+      </div>
+      <div class="soul-sec"><span class="eyebrow">The play</span><ol class="play-steps">${p.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol></div>
+      <div class="tool-tags">${p.tags.map((t) => `<span class="tool-tag">${esc(t)}</span>`).join('')}</div>
+      <div class="drawer-actions">
+        ${p.deploy ? `<button class="btn btn-primary btn-small" data-act="deploy-playbook" data-id="${p.id}">Deploy as campaign</button>` : ''}
+        <button class="btn btn-ghost btn-small" data-act="copy-playbook" data-id="${p.id}">Copy steps</button>
+      </div>
+    </article>`;
+}
+function deployPlaybook(id) {
+  const p = state.playbooks.find((x) => x.id === id);
+  if (!p || !p.deploy) return;
+  const d = p.deploy;
+  const c = {
+    id: 'c' + Date.now(), name: d.name, channel: d.channel, owner: d.channel === 'email' ? 'mailer' : 'connector',
+    icp: d.name, goalPerDay: d.goalPerDay, status: d.channel === 'email' ? 'warming' : 'draft',
+    sentToday: 0, totalSent: 0, replies: 0, booked: 0,
+    infra: d.channel === 'email' ? { domains: Math.ceil(d.goalPerDay / 100), inboxes: Math.ceil(d.goalPerDay / 20), warmDaysLeft: 14 } : null,
+    steps: p.steps.slice(0, 4).map((s, idx) => ({ day: idx, type: d.channel, label: s.slice(0, 40) })),
+    createdAt: new Date().toISOString(),
+  };
+  state.campaigns.unshift(c);
+  pushActivity(actorOf(c.owner), `Deployed playbook “${p.title}” as a campaign.`, c.channel === 'email' ? 'email' : 'linkedin');
+  commit(); toast('Playbook deployed → Campaigns.'); setView('campaigns');
+}
+async function copyPlaybook(id) {
+  const p = state.playbooks.find((x) => x.id === id);
+  if (!p) return;
+  const text = `${p.title}\n\n${p.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
+  try { await navigator.clipboard.writeText(text); toast('Steps copied.'); } catch { toast('Copy blocked by browser.'); }
 }
 
+/* ===================================================================== */
+/*  VIEW: TEAM                                                             */
+/* ===================================================================== */
+function renderTeam() {
+  const teams = state.teams || [{ id: 'outreach', name: 'Team', tagline: '', focus: '' }];
+  if (!teams.some((t) => t.id === activeTeam)) activeTeam = teams[0].id;
+  const team = teams.find((t) => t.id === activeTeam);
+  const roster = state.agents.filter((a) => (a.team || 'outreach') === activeTeam);
+  const live = roster.filter((a) => a.status === 'live').length;
+  const blocked = roster.filter((a) => a.status === 'blocked').length;
+
+  const tabs = teams.map((t) => {
+    const n = state.agents.filter((a) => (a.team || 'outreach') === t.id).length;
+    return `<button class="team-tab ${t.id === activeTeam ? 'on' : ''}" data-act="team-tab" data-id="${t.id}">
+      ${esc(t.name)}<span class="team-tab-count">${n}</span></button>`;
+  }).join('');
+
+  dom.views.team.innerHTML = `
+    <div class="team-tabs">${tabs}</div>
+    <div class="team-header">
+      <div>
+        <span class="eyebrow">${esc(team.focus || '')}</span>
+        <h2>${esc(team.name)}</h2>
+        <p>${esc(team.tagline || '')}</p>
+      </div>
+      <div class="team-header-stats">
+        <div class="mini-stat"><b>${roster.length}</b><span>agents</span></div>
+        <div class="mini-stat"><b class="tone-good">${live}</b><span>live</span></div>
+        <div class="mini-stat"><b class="${blocked ? 'tone-bad' : ''}">${blocked}</b><span>blocked</span></div>
+      </div>
+    </div>
+    <div class="agent-grid">${roster.map(agentCard).join('') || '<div class="kcol-empty">No agents on this team yet.</div>'}</div>`;
+}
 function agentCard(ag) {
   return `
     <article class="agent">
       <div class="agent-top">
         <button class="agent-id" data-act="open-agent" data-id="${ag.id}">
           <span class="avatar lg ${ag.status}">${initials(ag.codename)}</span>
-          <span class="agent-name-wrap">
-            <span class="agent-lane eyebrow">${esc(ag.lane)}</span>
-            <span class="agent-name">${esc(ag.codename)}</span>
-            <span class="agent-role">${esc(ag.role)}</span>
-          </span>
+          <span class="agent-name-wrap"><span class="agent-lane eyebrow">${esc(ag.lane)}</span><span class="agent-name">${esc(ag.codename)}</span><span class="agent-role">${esc(ag.role)}</span></span>
         </button>
         <span class="badge ${ag.status}">${statusLabel(ag.status)}</span>
       </div>
       <p class="agent-mission">${esc(ag.mission)}</p>
       <div class="agent-next"><span class="eyebrow">Next</span> ${esc(ag.next)}</div>
       ${ag.blocker ? `<div class="agent-blocker">⛔ ${esc(ag.blocker)}</div>` : ''}
-      <div class="agent-stats">
-        <span title="Confidence">⌁ ${Math.round(ag.confidence * 100)}%</span>
-        <span title="Last run">↻ ${relTime(ag.lastRun)}</span>
-        <span title="Progress">▰ ${ag.progress}%</span>
-      </div>
+      <div class="agent-stats"><span>⌁ ${Math.round(ag.confidence * 100)}%</span><span>↻ ${relTime(ag.lastRun)}</span><span>▰ ${ag.progress}%</span></div>
       <div class="progress"><span style="width:${ag.progress}%"></span></div>
       <div class="agent-actions">
         <button class="btn btn-ghost btn-small" data-act="agent" data-op="poke" data-id="${ag.id}">Poke</button>
-        <button class="btn btn-ghost btn-small" data-act="agent" data-op="work" data-id="${ag.id}">Work</button>
+        <button class="btn btn-ghost btn-small" data-act="agent" data-op="run" data-id="${ag.id}">Run</button>
         <button class="btn btn-ghost btn-small" data-act="agent" data-op="pause" data-id="${ag.id}">Pause</button>
-        <button class="btn btn-ghost btn-small warn" data-act="agent" data-op="escalate" data-id="${ag.id}">Escalate</button>
-        <button class="btn btn-primary btn-small" data-act="agent" data-op="finish" data-id="${ag.id}">Finish step</button>
+        <button class="btn btn-primary btn-small" data-act="open-agent" data-id="${ag.id}">Open</button>
       </div>
     </article>`;
-}
-
-/* ===================================================================== */
-/*  VIEW: QUEUE                                                            */
-/* ===================================================================== */
-function renderQueue() {
-  let items = state.tasks.filter((t) => {
-    if (queueFilter === 'all') return true;
-    if (queueFilter === 'active') return t.stage === 'in_progress';
-    if (queueFilter === 'blocked') return t.stage === 'blocked';
-    if (queueFilter === 'done') return t.stage === 'shipped';
-    return true;
-  });
-  if (state.meta.sortByPriority) items = [...items].sort((a, b) => pScore(a.priority) - pScore(b.priority) || a.dueIn - b.dueIn);
-
-  const filters = ['all', 'active', 'blocked', 'done'].map((f) =>
-    `<button class="chip ${queueFilter === f ? 'on' : ''}" data-act="queue-filter" data-filter="${f}">${f[0].toUpperCase() + f.slice(1)}</button>`
-  ).join('');
-
-  dom.views.queue.innerHTML = `
-    <div class="queue-bar">
-      <div class="chips">${filters}</div>
-      <button class="btn btn-ghost btn-small" data-act="sort-queue">${state.meta.sortByPriority ? '✓ Sorted by priority' : 'Sort by priority'}</button>
-    </div>
-    <div class="qtable">
-      <div class="qhead">
-        <span>Task</span><span>Owner</span><span>Lane</span><span>Priority</span><span>Stage</span><span>Due</span><span>Actions</span>
-      </div>
-      ${items.map(queueRow).join('') || `<div class="kcol-empty">No tasks match this filter.</div>`}
-    </div>`;
-}
-
-function queueRow(t) {
-  const ag = agentById(t.owner);
-  return `
-    <div class="qrow ${t.stage === 'blocked' ? 'is-blocked' : ''}">
-      <button class="qtitle" data-act="open-task" data-id="${t.id}">${esc(t.title)}<small>${esc(t.detail)}</small></button>
-      <span class="owner"><span class="avatar xs">${ag ? initials(ag.codename) : '?'}</span><span class="hide-sm">${ag ? esc(ag.codename) : t.owner}</span></span>
-      <span class="lane-chip">${esc(t.lane)}</span>
-      <span><span class="ptag p${t.priority[1]}">${t.priority}</span></span>
-      <span class="stage-chip st-${t.stage}">${stageLabel(t.stage)}</span>
-      <span class="due ${t.stage !== 'shipped' && t.dueIn <= 1 ? 'hot' : ''}">${t.stage === 'shipped' ? '—' : t.dueIn + 'd'}</span>
-      <span class="qactions">
-        <button class="btn btn-ghost btn-tiny" data-act="task" data-op="done" data-id="${t.id}" ${t.stage === 'shipped' ? 'disabled' : ''}>Done</button>
-        <button class="btn btn-ghost btn-tiny" data-act="task" data-op="defer" data-id="${t.id}">Defer</button>
-        <button class="btn btn-ghost btn-tiny" data-act="task" data-op="rerun" data-id="${t.id}">Rerun</button>
-      </span>
-    </div>`;
-}
-
-/* ===================================================================== */
-/*  VIEW: DECISIONS                                                        */
-/* ===================================================================== */
-function renderDecisions() {
-  const open = state.decisions.filter((d) => d.status === 'open');
-  const closed = state.decisions.filter((d) => d.status !== 'open');
-  dom.views.decisions.innerHTML = `
-    <div class="stack wide">${decisionsHTML(open, false) || '<div class="kcol-empty">Inbox zero. No decisions waiting on you.</div>'}</div>
-    ${closed.length ? `<div class="closed-head"><span class="eyebrow">Resolved (${closed.length})</span><button class="link" data-act="clear-decisions">Clear resolved</button></div>
-      <div class="stack wide muted">${closed.map(closedDecision).join('')}</div>` : ''}`;
-}
-
-function decisionsHTML(list, compact) {
-  return list.map((d) => {
-    const ag = agentById(d.requestedBy);
-    return `
-    <article class="decision urgency-${d.urgency}">
-      <div class="decision-head">
-        <div>
-          <span class="urgency-tag ${d.urgency}">${d.urgency}</span>
-          <strong>${esc(d.title)}</strong>
-        </div>
-        ${ag ? `<span class="req">↳ ${esc(ag.codename)}</span>` : ''}
-      </div>
-      <p>${esc(d.detail)}</p>
-      <div class="decision-actions">
-        <button class="btn btn-primary btn-small" data-act="decision" data-op="resolve" data-id="${d.id}">Resolve</button>
-        <button class="btn btn-ghost btn-small good" data-act="decision" data-op="approve" data-id="${d.id}">Approve</button>
-        <button class="btn btn-ghost btn-small warn" data-act="decision" data-op="reject" data-id="${d.id}">Reject</button>
-        ${compact ? '' : `<button class="btn btn-ghost btn-small" data-act="decision" data-op="sendback" data-id="${d.id}">Send back</button>`}
-        <button class="btn btn-ghost btn-small" data-act="decision" data-op="keep" data-id="${d.id}">Keep open</button>
-      </div>
-    </article>`;
-  }).join('');
-}
-
-function closedDecision(d) {
-  return `<article class="decision closed"><div class="decision-head"><strong>${esc(d.title)}</strong><span class="resolved-tag ${d.status}">${d.status}</span></div></article>`;
-}
-
-/* ===================================================================== */
-/*  VIEW: ALERTS                                                           */
-/* ===================================================================== */
-function renderAlerts() {
-  dom.views.alerts.innerHTML = state.alerts.length
-    ? `<div class="stack wide">${alertsHTML(state.alerts)}</div>`
-    : `<div class="kcol-empty">All clear. No alerts or blockers.</div>`;
-}
-
-function alertsHTML(list) {
-  return list.map((al) => {
-    const ag = agentById(al.relatedId);
-    return `
-    <article class="alert sev-${al.severity}">
-      <span class="alert-rail"></span>
-      <div class="alert-body">
-        <div class="alert-head">
-          <span class="alert-type">${esc(al.type)}</span>
-          <span class="sev-tag ${al.severity}">${al.severity}</span>
-        </div>
-        <strong>${esc(al.title)}</strong>
-        <p>${esc(al.detail)}</p>
-        <div class="alert-actions">
-          ${ag ? `<button class="btn btn-ghost btn-tiny" data-act="open-agent" data-id="${ag.id}">Open ${esc(ag.codename)}</button>` : ''}
-          <button class="btn btn-ghost btn-tiny" data-act="dismiss-alert" data-id="${al.id}">Dismiss</button>
-        </div>
-      </div>
-    </article>`;
-  }).join('');
 }
 
 /* ===================================================================== */
@@ -462,119 +546,88 @@ function alertsHTML(list) {
 function renderSouls() {
   const souls = window.LUINUS_SOULS;
   dom.views.souls.innerHTML = `<div class="soul-grid">${state.agents.map((ag) => {
-    const s = souls[ag.id];
-    if (!s) return '';
+    const s = souls[ag.id]; if (!s) return '';
     return `
     <article class="soul">
-      <div class="soul-head">
-        <span class="avatar lg ${ag.status}">${initials(s.codename)}</span>
-        <div>
-          <div class="soul-name">${esc(s.codename)} <span class="soul-role">· ${esc(ag.role)}</span></div>
-          <div class="soul-tagline">${esc(s.tagline)}</div>
-        </div>
-      </div>
+      <div class="soul-head"><span class="avatar lg ${ag.status}">${initials(s.codename)}</span>
+        <div><div class="soul-name">${esc(s.codename)} <span class="soul-role">· ${esc(ag.role)}</span></div><div class="soul-tagline">${esc(s.tagline)}</div></div></div>
       <div class="soul-directive"><span class="eyebrow">Prime directive</span><p>${esc(s.directive)}</p></div>
       <div class="soul-sec"><span class="eyebrow">Operating principles</span><ul>${s.principles.map((p) => `<li>${esc(p)}</li>`).join('')}</ul></div>
       <div class="soul-sec"><span class="eyebrow">Tools</span><div class="tool-tags">${s.tools.map((t) => `<span class="tool-tag">${esc(t)}</span>`).join('')}</div></div>
-      <div class="soul-rights">
-        <div><span class="eyebrow good">Decides</span><ul>${s.decide.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
-        <div><span class="eyebrow warn">Escalates</span><ul>${s.escalate.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
-      </div>
-      <div class="soul-voice">“${esc(stripQuotes(s.voice))}”</div>
+      <div class="soul-rights"><div><span class="eyebrow good">Decides</span><ul>${s.decide.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+        <div><span class="eyebrow warn">Escalates</span><ul>${s.escalate.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div></div>
+      <div class="soul-voice">“${esc(s.voice)}”</div>
       <a class="soul-link" href="${s.file}" target="_blank" rel="noopener">Read full soul.md →</a>
     </article>`;
   }).join('')}</div>`;
 }
 
 /* ===================================================================== */
-/*  DRAWER (drill-down)                                                    */
+/*  DRAWER                                                                 */
 /* ===================================================================== */
 function openAgentDrawer(id) {
-  const ag = agentById(id);
-  if (!ag) return;
+  const ag = agent(id); if (!ag) return;
   const s = window.LUINUS_SOULS[id];
-  const tasks = state.tasks.filter((t) => t.owner === id);
-  const acts = state.activity.filter((x) => x.actor.includes(ag.codename)).slice(0, 5);
+  const cs = state.campaigns.filter((c) => c.owner === id);
   dom.drawerInner.innerHTML = `
-    <div class="drawer-head">
-      <div class="drawer-id">
-        <span class="avatar xl ${ag.status}">${initials(ag.codename)}</span>
-        <div>
-          <div class="eyebrow">${esc(ag.lane)} lane</div>
-          <h2>${esc(ag.codename)}</h2>
-          <div class="agent-role">${esc(ag.name)} · ${esc(ag.role)}</div>
-        </div>
-      </div>
-      <button class="drawer-close" data-act="close-drawer">✕</button>
-    </div>
-    <div class="drawer-tags">
-      <span class="badge ${ag.status}">${statusLabel(ag.status)}</span>
-      <span class="kv">Confidence ${Math.round(ag.confidence * 100)}%</span>
-      <span class="kv">Progress ${ag.progress}%</span>
-      <span class="kv">Last run ${relTime(ag.lastRun)}</span>
-    </div>
+    <div class="drawer-head"><div class="drawer-id"><span class="avatar xl ${ag.status}">${initials(ag.codename)}</span>
+      <div><div class="eyebrow">${esc(ag.lane)}</div><h2>${esc(ag.codename)}</h2><div class="agent-role">${esc(ag.name)}</div></div></div>
+      <button class="drawer-close" data-act="close-drawer">✕</button></div>
+    <div class="drawer-tags"><span class="badge ${ag.status}">${statusLabel(ag.status)}</span><span class="kv">Confidence ${Math.round(ag.confidence * 100)}%</span><span class="kv">Last run ${relTime(ag.lastRun)}</span></div>
     <div class="progress big"><span style="width:${ag.progress}%"></span></div>
-
     <div class="drawer-sec"><span class="eyebrow">Mission</span><p>${esc(ag.mission)}</p></div>
     <div class="drawer-sec"><span class="eyebrow">Next action</span><p>${esc(ag.next)}</p></div>
     ${ag.blocker ? `<div class="agent-blocker">⛔ ${esc(ag.blocker)}</div>` : ''}
-
-    <div class="drawer-io">
-      <div><span class="eyebrow">Inputs</span><p>${esc(ag.io.inputs)}</p></div>
+    <div class="drawer-io"><div><span class="eyebrow">Inputs</span><p>${esc(ag.io.inputs)}</p></div>
       <div><span class="eyebrow">Outputs</span><p>${esc(ag.io.outputs)}</p></div>
-      <div><span class="eyebrow ${ag.io.errors.toLowerCase().includes('none') ? '' : 'warn'}">Errors</span><p>${esc(ag.io.errors)}</p></div>
-    </div>
-
+      <div><span class="eyebrow ${ag.io.errors.toLowerCase().includes('none') ? '' : 'warn'}">Status</span><p>${esc(ag.io.errors)}</p></div></div>
     <div class="drawer-sec"><span class="eyebrow">Tools</span><div class="tool-tags">${ag.tools.map((t) => `<span class="tool-tag">${esc(t)}</span>`).join('')}</div></div>
-
-    <div class="drawer-sec"><span class="eyebrow">Related tasks (${tasks.length})</span>
-      <div class="mini-list">${tasks.map((t) => `<button class="mini-row" data-act="open-task" data-id="${t.id}"><span class="ptag p${t.priority[1]}">${t.priority}</span> ${esc(t.title)} <span class="stage-chip st-${t.stage}">${stageLabel(t.stage)}</span></button>`).join('') || '<p class="subtle">None</p>'}</div>
-    </div>
-
-    <div class="drawer-sec"><span class="eyebrow">Recent timeline</span>
-      <div class="activity">${acts.length ? activityHTML(acts) : '<p class="subtle">No recent moves.</p>'}</div>
-    </div>
-
+    ${cs.length ? `<div class="drawer-sec"><span class="eyebrow">Campaigns (${cs.length})</span><div class="mini-list">${cs.map((c) => `<button class="mini-row" data-act="open-campaign" data-id="${c.id}"><span class="ch-badge sm ${c.channel}">${channelIcon(c.channel)}</span> ${esc(c.name)} <span class="status-chip st-${c.status}">${c.status}</span></button>`).join('')}</div></div>` : ''}
     <div class="drawer-actions">
       <button class="btn btn-ghost btn-small" data-act="agent" data-op="poke" data-id="${ag.id}">Poke</button>
-      <button class="btn btn-ghost btn-small" data-act="agent" data-op="work" data-id="${ag.id}">Work</button>
-      <button class="btn btn-ghost btn-small warn" data-act="agent" data-op="escalate" data-id="${ag.id}">Escalate</button>
-      <button class="btn btn-primary btn-small" data-act="agent" data-op="finish" data-id="${ag.id}">Finish step</button>
-      ${s ? `<a class="btn btn-ghost btn-small" href="${s.file}" target="_blank" rel="noopener">soul.md →</a>` : ''}
+      <button class="btn btn-ghost btn-small" data-act="agent" data-op="run" data-id="${ag.id}">Run</button>
+      <button class="btn btn-ghost btn-small" data-act="agent" data-op="pause" data-id="${ag.id}">Pause</button>
+      ${s ? `<a class="btn btn-primary btn-small" href="${s.file}" target="_blank" rel="noopener">soul.md →</a>` : ''}
     </div>`;
   openDrawer();
 }
 
-function openTaskDrawer(id) {
-  const t = state.tasks.find((x) => x.id === id);
-  if (!t) return;
-  const ag = agentById(t.owner);
+function openCampaignDrawer(id) {
+  const c = camp(id); if (!c) return;
+  const ag = agent(c.owner);
+  const leads = state.leads.filter((l) => l.campaignId === id);
+  const pct = c.goalPerDay ? Math.min(100, Math.round(c.sentToday / c.goalPerDay * 100)) : 0;
   dom.drawerInner.innerHTML = `
-    <div class="drawer-head">
-      <div class="drawer-id">
-        <span class="ptag big p${t.priority[1]}">${t.priority}</span>
-        <div><div class="eyebrow">${esc(t.lane)} · ${stageLabel(t.stage)}</div><h2>${esc(t.title)}</h2></div>
-      </div>
-      <button class="drawer-close" data-act="close-drawer">✕</button>
-    </div>
-    <div class="drawer-tags">
-      <span class="stage-chip st-${t.stage}">${stageLabel(t.stage)}</span>
-      <span class="kv">Owner ${ag ? esc(ag.codename) : t.owner}</span>
-      <span class="kv ${t.stage !== 'shipped' && t.dueIn <= 1 ? 'hot' : ''}">${t.stage === 'shipped' ? 'Shipped' : 'Due in ' + t.dueIn + 'd'}</span>
-    </div>
-    <div class="drawer-sec"><span class="eyebrow">Detail</span><p>${esc(t.detail)}</p></div>
-    <div class="drawer-sec"><span class="eyebrow">Notes</span><p>${esc(t.notes || '—')}</p></div>
-    <div class="drawer-sec"><span class="eyebrow">Dependencies</span>${t.deps && t.deps.length ? `<div class="tool-tags">${t.deps.map((d) => `<span class="tool-tag dep">⛓ ${esc(d)}</span>`).join('')}</div>` : '<p class="subtle">None — unblocked.</p>'}</div>
-
-    <div class="drawer-sec"><span class="eyebrow">Move to stage</span>
-      <div class="stage-picker">${STAGES.map((s) => `<button class="chip ${t.stage === s.id ? 'on' : ''}" data-act="set-stage" data-id="${t.id}" data-stage="${s.id}">${s.label}</button>`).join('')}</div>
-    </div>
-
+    <div class="drawer-head"><div class="drawer-id"><span class="ch-badge lg ${c.channel}">${channelIcon(c.channel)}</span>
+      <div><div class="eyebrow">${c.channel} · ${esc(c.icp)}</div><h2>${esc(c.name)}</h2></div></div>
+      <button class="drawer-close" data-act="close-drawer">✕</button></div>
+    <div class="drawer-tags"><span class="status-chip st-${c.status}">${c.status}</span><span class="kv">Owner ${ag ? esc(ag.codename) : c.owner}</span><span class="kv">${c.goalPerDay}/day goal</span></div>
+    <div class="goal-row"><span>${c.sentToday}/${c.goalPerDay} today</span><span>${pct}%</span></div>
+    <div class="goal-bar big"><span style="width:${pct}%"></span></div>
+    <div class="campaign-stats wide"><div><b>${c.totalSent}</b><span>total sent</span></div><div><b>${c.replies}</b><span>replies</span></div><div><b>${c.booked}</b><span>booked</span></div><div><b>${c.totalSent ? (c.replies / c.totalSent * 100).toFixed(1) : '0.0'}%</b><span>reply rate</span></div></div>
+    ${c.infra ? `<div class="infra-note">📮 ${c.infra.domains} domains · ${c.infra.inboxes} inboxes · ~${Math.round(c.goalPerDay / Math.max(1, c.infra.inboxes))}/inbox/day${c.infra.warmDaysLeft ? ` · 🔥 warming ${c.infra.warmDaysLeft}d` : ''}</div>` : ''}
+    <div class="drawer-sec"><span class="eyebrow">Sequence</span><div class="seq">${c.steps.map((s) => `<div class="seq-step"><span class="seq-day">${s.type === 'engage' || s.day === 0 ? 'Day 0' : 'Day ' + s.day}</span><span class="seq-type t-${s.type}">${s.type}</span><span>${esc(s.label)}</span></div>`).join('')}</div></div>
+    <div class="drawer-sec"><span class="eyebrow">Leads in this campaign (${leads.length})</span><div class="mini-list">${leads.slice(0, 6).map((l) => `<button class="mini-row" data-act="open-lead" data-id="${l.id}">${esc(l.name)} <span class="stage-chip pst-${l.stage}">${stageLabel(l.stage)}</span></button>`).join('') || '<p class="subtle">None yet.</p>'}</div></div>
     <div class="drawer-actions">
-      <button class="btn btn-primary btn-small" data-act="task" data-op="done" data-id="${t.id}" ${t.stage === 'shipped' ? 'disabled' : ''}>Mark done</button>
-      <button class="btn btn-ghost btn-small" data-act="task" data-op="defer" data-id="${t.id}">Defer</button>
-      <button class="btn btn-ghost btn-small" data-act="task" data-op="rerun" data-id="${t.id}">Rerun</button>
+      ${c.status === 'live' ? `<button class="btn btn-ghost btn-small" data-act="campaign" data-op="pause" data-id="${c.id}">Pause</button>` : `<button class="btn btn-primary btn-small" data-act="campaign" data-op="start" data-id="${c.id}">${c.status === 'warming' ? 'Skip warmup & launch' : 'Launch'}</button>`}
       ${ag ? `<button class="btn btn-ghost btn-small" data-act="open-agent" data-id="${ag.id}">Open ${esc(ag.codename)}</button>` : ''}
+    </div>`;
+  openDrawer();
+}
+
+function openLeadDrawer(id) {
+  const l = lead(id); if (!l) return;
+  const c = camp(l.campaignId);
+  dom.drawerInner.innerHTML = `
+    <div class="drawer-head"><div class="drawer-id"><span class="avatar lg">${initials(l.name.replace('Dr. ', ''))}</span>
+      <div><div class="eyebrow">${esc(l.specialty)} · ${esc(l.geo)}</div><h2>${esc(l.name)}</h2><div class="agent-role">${esc(l.title)} · ${esc(l.org)}</div></div></div>
+      <button class="drawer-close" data-act="close-drawer">✕</button></div>
+    <div class="drawer-tags"><span class="stage-chip pst-${l.stage}">${stageLabel(l.stage)}</span><span class="ch-badge sm ${l.channel}">${channelIcon(l.channel)}</span>${c ? `<span class="kv">${esc(c.name)}</span>` : ''}</div>
+    <div class="drawer-sec"><span class="eyebrow">Note</span><p>${esc(l.note || '—')}</p></div>
+    <div class="drawer-sec"><span class="eyebrow">Move stage</span><div class="stage-picker">${PIPELINE.map((s) => `<button class="chip ${l.stage === s.id ? 'on' : ''}" data-act="set-lead-stage" data-id="${l.id}" data-stage="${s.id}">${s.label}</button>`).join('')}</div></div>
+    <div class="drawer-actions">
+      <button class="btn btn-primary btn-small" data-act="set-lead-stage" data-id="${l.id}" data-stage="booked">Mark booked</button>
+      <button class="btn btn-ghost btn-small warn" data-act="set-lead-stage" data-id="${l.id}" data-stage="passed">Pass</button>
     </div>`;
   openDrawer();
 }
@@ -585,271 +638,177 @@ function closeDrawer() { dom.drawer.classList.remove('open'); dom.drawerBackdrop
 /* ===================================================================== */
 /*  ACTIONS                                                                */
 /* ===================================================================== */
-function bindGlobalActions() {
-  dom.nav.addEventListener('click', (e) => {
-    const item = e.target.closest('.nav-item');
-    if (item) setView(item.dataset.view);
-  });
-  dom.refreshBtn.addEventListener('click', () => { refreshCycle(); });
+function bindGlobal() {
+  dom.nav.addEventListener('click', (e) => { const it = e.target.closest('.nav-item'); if (it) setView(it.dataset.view); });
+  dom.refreshBtn.addEventListener('click', refreshCycle);
   dom.exportBtn.addEventListener('click', exportSnapshot);
   dom.autopilotToggle.addEventListener('click', toggleAutopilot);
   dom.drawerBackdrop.addEventListener('click', closeDrawer);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 
-  // Delegated clicks for everything with data-act.
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-act]');
-    if (!el) return;
-    const act = el.dataset.act;
+    const el = e.target.closest('[data-act]'); if (!el) return;
     const id = el.dataset.id;
-    switch (act) {
+    switch (el.dataset.act) {
       case 'goto': setView(el.dataset.view); break;
-      case 'rec-go': recommendation().go(); break;
+      case 'team-tab': activeTeam = id; renderTeam(); break;
+      case 'rec-go': nextAction().go(); break;
+      case 'composer-send': submitComposer(); break;
+      case 'chip': composerText = el.dataset.text; renderCommand(); $('composerInput').focus(); break;
       case 'open-agent': openAgentDrawer(id); break;
-      case 'open-task': openTaskDrawer(id); break;
+      case 'open-campaign': openCampaignDrawer(id); break;
+      case 'open-lead': openLeadDrawer(id); break;
       case 'close-drawer': closeDrawer(); break;
       case 'agent': agentAction(id, el.dataset.op); break;
-      case 'task': taskAction(id, el.dataset.op); break;
-      case 'set-stage': moveTaskStage(id, el.dataset.stage); openTaskDrawer(id); break;
-      case 'decision': decisionAction(id, el.dataset.op); break;
-      case 'queue-filter': queueFilter = el.dataset.filter; renderQueue(); break;
-      case 'sort-queue': state.meta.sortByPriority = !state.meta.sortByPriority; commit(); break;
-      case 'clear-decisions': state.decisions = state.decisions.filter((d) => d.status === 'open'); commit(); toast('Cleared resolved.'); break;
-      case 'dismiss-alert': state.alerts = state.alerts.filter((a) => a.id !== id); pushActivity(systemActor(), 'Alert dismissed.', 'orchestration'); commit(); break;
-      case 'advance': advanceCycle(); break;
+      case 'campaign': campaignAction(id, el.dataset.op); break;
+      case 'inbox': inboxAction(id, el.dataset.op); break;
+      case 'set-lead-stage': moveLead(id, el.dataset.stage); if (dom.drawer.classList.contains('open')) openLeadDrawer(id); break;
+      case 'deploy-playbook': deployPlaybook(id); break;
+      case 'copy-playbook': copyPlaybook(id); break;
     }
   });
 }
 
 function agentAction(id, op) {
-  const ag = agentById(id);
-  if (!ag) return;
-  ag.lastRun = new Date().toISOString();
-  if (op === 'poke') { ag.status = ag.status === 'blocked' ? 'blocked' : 'live'; ag.progress = clamp(ag.progress + 5); pushActivity(actor(ag), `${ag.codename} was poked.`, ag.lane.toLowerCase()); }
-  if (op === 'work') { if (ag.status !== 'blocked') ag.status = 'live'; ag.progress = clamp(ag.progress + 11); ag.confidence = clamp01(ag.confidence + 0.03); pushActivity(actor(ag), `${ag.codename} is working the lane.`, ag.lane.toLowerCase()); }
-  if (op === 'pause') { ag.status = 'idle'; pushActivity(actor(ag), `${ag.codename} paused.`, ag.lane.toLowerCase()); }
-  if (op === 'escalate') {
-    ag.status = 'blocked';
-    state.decisions.unshift({ id: 'd' + Date.now(), title: `Escalation from ${ag.codename}`, detail: ag.blocker || `${ag.codename} needs a founder call to proceed.`, owner: 'Founder', urgency: 'high', requestedBy: ag.id, status: 'open' });
-    pushActivity(actor(ag), `${ag.codename} escalated to the founder.`, ag.lane.toLowerCase());
-    toast(`${ag.codename} escalated — added to your inbox.`);
-  }
-  if (op === 'finish') {
-    ag.status = 'done'; ag.progress = 100; ag.confidence = clamp01(ag.confidence + 0.05);
-    const t = state.tasks.find((x) => x.owner === id && x.stage !== 'shipped');
-    if (t) { t.stage = 'shipped'; pushActivity(actor(ag), `${ag.codename} finished a step — shipped “${t.title}”.`, ag.lane.toLowerCase()); }
-    else pushActivity(actor(ag), `${ag.codename} completed a step.`, ag.lane.toLowerCase());
-  }
-  reconcileAlerts();
+  const ag = agent(id); if (!ag) return;
+  ag.lastRun = now();
+  if (op === 'poke') { if (ag.status !== 'blocked') ag.status = 'live'; ag.progress = clamp(ag.progress + 5); pushActivity(actorOf(id), `${ag.codename} poked.`, lane(ag)); }
+  if (op === 'run') { if (ag.status !== 'blocked') ag.status = 'live'; ag.progress = clamp(ag.progress + 12); ag.confidence = clamp01(ag.confidence + 0.03); pushActivity(actorOf(id), `${ag.codename} is running its lane.`, lane(ag)); }
+  if (op === 'pause') { ag.status = 'idle'; pushActivity(actorOf(id), `${ag.codename} paused.`, lane(ag)); }
   commit();
   if (dom.drawer.classList.contains('open')) openAgentDrawer(id);
 }
 
-function taskAction(id, op) {
-  const t = state.tasks.find((x) => x.id === id);
-  if (!t) return;
-  if (op === 'done') { t.stage = 'shipped'; pushActivity(systemActor(), `Marked done: ${t.title}.`, t.lane.toLowerCase()); toast(`Shipped “${t.title}”.`); }
-  if (op === 'defer') { t.dueIn += 2; t.priority = t.priority === 'P0' ? 'P1' : 'P2'; pushActivity(systemActor(), `Deferred: ${t.title}.`, t.lane.toLowerCase()); }
-  if (op === 'rerun') { t.stage = 'in_progress'; const ag = agentById(t.owner); if (ag && ag.status !== 'blocked') ag.status = 'live'; pushActivity(systemActor(), `Re-queued: ${t.title}.`, t.lane.toLowerCase()); }
-  reconcileAlerts();
-  commit();
-  if (dom.drawer.classList.contains('open')) openTaskDrawer(id);
-}
-
-function decisionAction(id, op) {
-  const d = state.decisions.find((x) => x.id === id);
-  if (!d) return;
-  if (op === 'keep') { pushActivity(systemActor(), `Kept open: ${d.title}.`, 'orchestration'); commit(); return; }
-  d.status = op === 'reject' ? 'rejected' : op === 'sendback' ? 'sent back' : 'resolved';
-  // Resolving the pricing decision unblocks Sales.
-  if (d.requestedBy) {
-    const ag = agentById(d.requestedBy);
-    if (ag && op !== 'sendback') {
-      if (ag.status === 'blocked') { ag.status = 'live'; ag.blocker = null; ag.progress = clamp(ag.progress + 8); }
-      const t = state.tasks.find((x) => x.owner === ag.id && x.stage === 'blocked');
-      if (t && op !== 'reject') { t.stage = 'in_progress'; t.deps = []; }
-    }
+function campaignAction(id, op) {
+  const c = camp(id); if (!c) return;
+  if (op === 'start') {
+    c.status = 'live';
+    if (c.infra) c.infra.warmDaysLeft = 0;
+    const ag = agent(c.owner); if (ag && ag.status !== 'blocked') ag.status = 'live';
+    pushActivity(actorOf(c.owner), `Launched campaign: ${c.name}.`, c.channel === 'email' ? 'email' : 'linkedin');
+    toast(`${c.name} is live.`);
+  } else if (op === 'pause') {
+    c.status = 'paused';
+    pushActivity(actorOf(c.owner), `Paused campaign: ${c.name}.`, c.channel === 'email' ? 'email' : 'linkedin');
+    toast(`${c.name} paused.`);
   }
-  pushActivity(systemActor(), `Decision ${d.status}: ${d.title}.`, 'orchestration');
-  reconcileAlerts();
   commit();
-  toast(`Decision ${d.status}.`);
+  if (dom.drawer.classList.contains('open')) openCampaignDrawer(id);
 }
 
-/* --------------------------------------------------------- cycle engine */
 function refreshCycle() {
-  state.agents.forEach((ag, i) => {
-    if (ag.status === 'blocked') return;
-    const roll = Math.random();
-    if (i === 0) ag.status = 'live';
-    else if (ag.status === 'done') ag.status = roll > 0.5 ? 'idle' : 'live';
-    else ag.status = roll > 0.7 ? 'idle' : roll > 0.25 ? 'live' : ag.status;
-    ag.progress = clamp(ag.progress + Math.round(Math.random() * 5 - 1));
-    ag.lastRun = new Date().toISOString();
-  });
-  pushActivity(systemActor(), 'Refresh cycle: COO synced every lane.', 'orchestration');
-  reconcileAlerts();
-  commit();
-  toast('Cycle refreshed.');
-}
-
-function advanceCycle() {
-  // Push one piece of work forward through the pipeline.
-  const order = ['backlog', 'in_progress', 'review'];
-  const movable = state.tasks.find((t) => order.includes(t.stage) && t.stage !== 'blocked');
-  if (movable) {
-    const next = movable.stage === 'backlog' ? 'in_progress' : movable.stage === 'in_progress' ? 'review' : 'shipped';
-    const from = movable.stage; movable.stage = next;
-    pushActivity(systemActor(), `Advanced “${movable.title}” ${stageLabel(from)} → ${stageLabel(next)}.`, movable.lane.toLowerCase());
-  }
-  const live = state.agents.find((a) => a.status !== 'done' && a.status !== 'blocked');
-  if (live) { live.progress = clamp(live.progress + 7); live.status = 'live'; live.lastRun = new Date().toISOString(); }
-  reconcileAlerts();
-  commit();
-  toast('Company cycle advanced.');
+  state.agents.forEach((ag) => { if (ag.status === 'idle' && Math.random() > 0.5) { ag.status = 'live'; ag.lastRun = now(); } });
+  pushActivity(actorOf('scout'), 'Refresh: team re-synced lists, sends, and replies.', 'leads');
+  commit(); toast('Refreshed.');
 }
 
 /* ----------------------------------------------------------- autopilot */
-function toggleAutopilot() {
-  state.meta.autopilot = !state.meta.autopilot;
-  if (state.meta.autopilot) startAutopilot(); else stopAutopilot();
-  syncAutopilotUI();
-  save();
-}
+function toggleAutopilot() { state.meta.autopilot = !state.meta.autopilot; if (state.meta.autopilot) startAutopilot(); else stopAutopilot(); syncAutopilotUI(); save(); }
 function startAutopilot(silent) {
   state.meta.autopilot = true;
   if (autopilotTimer) clearInterval(autopilotTimer);
-  autopilotTimer = setInterval(autopilotTick, 6000);
-  if (!silent) { pushActivity(systemActor(), 'Autopilot engaged — agents are running 24/7.', 'orchestration'); commit(); toast('24/7 Autopilot ON.'); }
+  autopilotTimer = setInterval(autopilotTick, 5000);
+  if (!silent) { pushActivity(actorOf('scout'), 'Autopilot engaged — team is sending 24/7.', 'leads'); commit(); toast('24/7 Autopilot ON.'); }
 }
-function stopAutopilot() {
-  state.meta.autopilot = false;
-  if (autopilotTimer) clearInterval(autopilotTimer);
-  autopilotTimer = null;
-  pushActivity(systemActor(), 'Autopilot paused.', 'orchestration');
-  commit();
-  toast('Autopilot paused.');
-}
+function stopAutopilot() { state.meta.autopilot = false; if (autopilotTimer) clearInterval(autopilotTimer); autopilotTimer = null; pushActivity(actorOf('scout'), 'Autopilot paused.', 'leads'); commit(); toast('Autopilot paused.'); }
 function syncAutopilotUI() {
   dom.autopilotToggle.classList.toggle('on', state.meta.autopilot);
   dom.autopilotToggle.setAttribute('aria-checked', String(state.meta.autopilot));
-  dom.autopilotSub.textContent = state.meta.autopilot ? 'Running · agents active' : 'Paused';
+  dom.autopilotSub.textContent = state.meta.autopilot ? 'Running · team active' : 'Paused';
 }
 function autopilotTick() {
-  const live = state.agents.filter((a) => a.status !== 'blocked');
-  const ag = live[Math.floor(Math.random() * live.length)];
-  if (ag) {
-    ag.status = 'live'; ag.progress = clamp(ag.progress + Math.round(Math.random() * 6 + 2)); ag.lastRun = new Date().toISOString();
-    if (ag.progress >= 100) { ag.status = 'done'; }
-  }
-  // Occasionally move a task forward.
-  if (Math.random() > 0.45) {
-    const t = state.tasks.find((x) => ['backlog', 'in_progress', 'review'].includes(x.stage));
-    if (t) { const from = t.stage; t.stage = from === 'backlog' ? 'in_progress' : from === 'in_progress' ? 'review' : 'shipped';
-      pushActivity(actor(agentById(t.owner) || {}), `Autopilot moved “${t.title}” → ${stageLabel(t.stage)}.`, t.lane.toLowerCase()); }
-  } else if (ag) {
-    pushActivity(actor(ag), `${ag.codename} advanced its lane (+progress).`, ag.lane.toLowerCase());
-  }
-  reconcileAlerts();
+  state.campaigns.forEach((c) => {
+    if (c.status === 'warming' && c.infra) {
+      if (Math.random() > 0.6) c.infra.warmDaysLeft = Math.max(0, c.infra.warmDaysLeft - 1);
+      if (c.infra.warmDaysLeft === 0) { c.status = 'live'; pushActivity(actorOf(c.owner), `${c.name} finished warming — now sending.`, c.channel === 'email' ? 'email' : 'linkedin'); }
+      return;
+    }
+    if (c.status !== 'live') return;
+    const batch = c.channel === 'email' ? Math.round(8 + Math.random() * 22) : Math.round(2 + Math.random() * 5);
+    const room = Math.max(0, (c.goalPerDay || 0) - c.sentToday);
+    const sent = Math.min(batch, room || batch);
+    c.sentToday += sent; c.totalSent += sent;
+    if (Math.random() > 0.55) { const r = 1 + Math.round(Math.random() * 2); c.replies += r;
+      if (Math.random() > 0.6) state.leads.push(replyLead(c)); }
+    if (Math.random() > 0.85) { c.booked += 1; const src = state.leads.find((l) => l.campaignId === c.id && l.stage === 'replied'); if (src) src.stage = 'booked'; pushActivity(actorOf('closer'), `Autopilot booked a demo from ${c.name}.`, 'pipeline'); }
+  });
+  // gentle agent progress
+  const a = state.agents[Math.floor(Math.random() * state.agents.length)];
+  if (a && a.status !== 'blocked') { a.status = 'live'; a.progress = clamp(a.progress + Math.round(Math.random() * 5)); a.lastRun = now(); }
+  if (Math.random() > 0.5) { const lc = state.campaigns.find((c) => c.status === 'live'); if (lc) pushActivity(actorOf(lc.owner), `${lc.name}: +${lc.channel === 'email' ? 'emails' : 'DMs'} sent.`, lc.channel === 'email' ? 'email' : 'linkedin'); }
   commit();
-}
-
-/* ----------------------------------------------------------- alerts sync */
-function reconcileAlerts() {
-  // Keep derived blocker alerts honest; preserve seeded/manual ones not derivable.
-  const derived = [];
-  state.agents.filter((a) => a.status === 'blocked').forEach((a) =>
-    derived.push({ id: 'blk-' + a.id, type: 'Blocked lane', title: `${a.codename} is blocked`, detail: a.blocker || `${a.name} cannot proceed without a decision.`, severity: 'critical', relatedId: a.id }));
-  // Stale: idle and last run > 45m
-  state.agents.filter((a) => a.status === 'idle' && minutesSince(a.lastRun) > 45).forEach((a) =>
-    derived.push({ id: 'stale-' + a.id, type: 'Stale agent', title: `${a.codename} idle ${Math.round(minutesSince(a.lastRun))}m`, detail: 'Lane is overdue for a run.', severity: 'warn', relatedId: a.id }));
-  const manual = state.alerts.filter((a) => !a.id.startsWith('blk-') && !a.id.startsWith('stale-') && !['al1', 'al4'].includes(a.id));
-  state.alerts = [...derived, ...manual];
 }
 
 /* ------------------------------------------------------------- export */
 async function exportSnapshot() {
-  const snap = {
-    exportedAt: new Date().toISOString(),
-    metrics: metrics(),
-    agents: state.agents.map((a) => ({ codename: a.codename, status: a.status, progress: a.progress, confidence: a.confidence })),
-    tasks: state.tasks.map((t) => ({ title: t.title, stage: t.stage, priority: t.priority, owner: t.owner })),
-    decisions: state.decisions,
-    alerts: state.alerts,
-    activity: state.activity,
-  };
+  const snap = { exportedAt: new Date().toISOString(), metrics: metrics(),
+    campaigns: state.campaigns.map((c) => ({ name: c.name, channel: c.channel, status: c.status, sentToday: c.sentToday, totalSent: c.totalSent, replies: c.replies, booked: c.booked })),
+    pipeline: PIPELINE.map((s) => ({ stage: s.label, count: state.leads.filter((l) => l.stage === s.id).length })),
+    inbox: state.inbox, activity: state.activity };
   const text = JSON.stringify(snap, null, 2);
   try {
-    const blob = new Blob([text], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `luinus-snapshot-${Date.now()}.json`;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const a = document.createElement('a'); a.href = url; a.download = `luinus-outreach-${Date.now()}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     if (navigator.clipboard) await navigator.clipboard.writeText(text).catch(() => {});
     toast('Snapshot exported + copied.');
-  } catch (_) {
-    toast('Snapshot ready (download blocked).');
-  }
-  pushActivity(systemActor(), 'Founder exported a company snapshot.', 'orchestration');
+  } catch { toast('Snapshot ready (download blocked).'); }
+  pushActivity(actorOf('scout'), 'Exported an outreach snapshot.', 'leads');
   commit();
 }
 
 /* ---------------------------------------------------------------- utils */
-function agentById(id) { return state.agents.find((a) => a.id === id); }
-function actor(ag) { return ag && ag.codename ? `${ag.codename} (${roleShort(ag)})` : systemActor(); }
-function roleShort(ag) { return ({ coo: 'COO', sales: 'Sales', marketing: 'Mktg', product: 'Product', ops: 'Ops', qa: 'QA', research: 'Research', support: 'CS' })[ag.id] || ag.lane; }
-function systemActor() { return 'Atlas (COO)'; }
+function agent(id) { return state.agents.find((a) => a.id === id); }
+function camp(id) { return state.campaigns.find((c) => c.id === id); }
+function lead(id) { return state.leads.find((l) => l.id === id); }
+function unblockAgent(id) { const ag = agent(id); if (ag && ag.status === 'blocked') { ag.status = 'live'; ag.blocker = null; } }
+function lane(ag) { return (ag.lane || '').toLowerCase(); }
+const CODES = { scout: 'Scout (Leads)', scribe: 'Scribe (Copy)', mailer: 'Mailer (Email)', connector: 'Connector (LinkedIn)', closer: 'Closer (Pipeline)', pulse: 'Pulse (Marketing)', anchor: 'Anchor (Infra)' };
+function actorOf(id) { return CODES[id] || 'System'; }
+
+function freshLead(c) {
+  const names = ['Dr. Morales', 'Dr. Bennett', 'Dr. Shah', 'Dr. Larsen', 'Dr. Okafor', 'Dr. Reyes'];
+  const geos = ['TX', 'CA', 'NY', 'FL', 'IL', 'WA'];
+  return { id: 'l' + Date.now() + Math.floor(Math.random() * 99), name: pick(names), title: 'ER Attending', org: 'New Lead Health', specialty: 'Emergency', geo: pick(geos), channel: c ? c.channel : 'email', campaignId: c ? c.id : null, stage: 'sourced', note: 'Approved + verified.' };
+}
+function replyLead(c) {
+  const names = ['Dr. Foster', 'Dr. Hughes', 'Dr. Pena', 'Dr. Wallace', 'Dr. Idris'];
+  const geos = ['TX', 'CA', 'NY', 'FL', 'OH'];
+  return { id: 'l' + Date.now() + Math.floor(Math.random() * 99), name: pick(names), title: 'Medical Director', org: 'Replied Health', specialty: 'Emergency', geo: pick(geos), channel: c.channel, campaignId: c.id, stage: 'replied', note: 'Replied from outreach — qualify.' };
+}
 
 function pushActivity(actorName, message, type) {
-  state.activity.unshift({ id: 'a' + Date.now() + Math.random().toString(16).slice(2, 6), time: new Date().toISOString(), actor: actorName, type: type || 'orchestration', message });
+  state.activity.unshift({ id: 'a' + Date.now() + Math.random().toString(16).slice(2, 6), time: now(), actor: actorName, type: type || 'leads', message });
   state.activity = state.activity.slice(0, 40);
 }
-
 function activityHTML(list) {
-  return list.map((a) => `
-    <div class="activity-item">
-      <span class="act-dot type-${esc(a.type || 'orchestration')}"></span>
-      <div class="act-body">
-        <div class="act-msg">${esc(a.message)}</div>
-        <div class="act-meta"><span>${esc(a.actor)}</span><time>${relTime(a.time)}</time></div>
-      </div>
-    </div>`).join('');
+  return list.map((a) => `<div class="activity-item"><span class="act-dot type-${esc(a.type || 'leads')}"></span>
+    <div class="act-body"><div class="act-msg">${esc(a.message)}</div><div class="act-meta"><span>${esc(a.actor)}</span><time>${relTime(a.time)}</time></div></div></div>`).join('');
 }
 
-function tile(label, value, tone, hint) {
-  return `<div class="tile ${tone}"><div class="tile-label">${esc(label)}</div><div class="tile-value">${esc(value)}</div><div class="tile-hint">${esc(hint)}</div></div>`;
+function goalTile(label, value, goal, tone) {
+  const pct = goal ? Math.min(100, Math.round(value / goal * 100)) : 0;
+  return `<div class="tile ${tone}"><div class="tile-label">${esc(label)}</div><div class="tile-value">${fmt(value)}<span class="tile-goal">/ ${fmt(goal)}</span></div><div class="goal-bar"><span style="width:${pct}%"></span></div></div>`;
 }
-
-function startClock() {
-  const upd = () => {
-    dom.clockPill.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  };
-  upd();
-  if (clockTimer) clearInterval(clockTimer);
-  clockTimer = setInterval(upd, 1000);
+function statTile(label, value, hint, tone) {
+  return `<div class="tile ${tone}"><div class="tile-label">${esc(label)}</div><div class="tile-value">${fmt(value)}</div><div class="tile-hint">${esc(hint)}</div></div>`;
 }
+function chip(text) { return `<button class="qchip" data-act="chip" data-text="${esc(text)}">${esc(text)}</button>`; }
 
-function toast(msg) {
-  dom.toast.textContent = msg;
-  dom.toast.classList.add('show');
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => dom.toast.classList.remove('show'), 2200);
-}
+function startClock() { const u = () => dom.clockPill.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }); u(); if (clockTimer) clearInterval(clockTimer); clockTimer = setInterval(u, 1000); }
+function toast(m) { dom.toast.textContent = m; dom.toast.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => dom.toast.classList.remove('show'), 2200); }
 
+function channelIcon(ch) { return ch === 'email' ? '✉' : ch === 'linkedin' ? 'in' : ch === 'content' ? '✎' : ch === 'pipeline' ? '◉' : '•'; }
+function inboxLabel(t) { return ({ reply: 'Reply', objection: 'Objection', 'approve-copy': 'Approve copy', 'approve-leads': 'Approve leads', book: 'Booking' })[t] || t; }
 function statusLabel(s) { return ({ live: 'Live', idle: 'Idle', blocked: 'Blocked', waiting: 'Waiting', done: 'Done' })[s] || s; }
-function stageLabel(s) { return (STAGES.find((x) => x.id === s) || {}).label || s; }
-function pScore(p) { return p === 'P0' ? 0 : p === 'P1' ? 1 : 2; }
+function stageLabel(s) { return (PIPELINE.find((x) => x.id === s) || {}).label || s; }
+function sum(arr) { return arr.reduce((a, b) => a + (b || 0), 0); }
 function clamp(v) { return Math.min(100, Math.max(0, Math.round(v))); }
 function clamp01(v) { return Math.min(1, Math.max(0, v)); }
-function initials(name) { return (name || '?').slice(0, 2).toUpperCase(); }
-function relTime(iso) {
-  const mins = minutesSince(iso);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${Math.round(mins)}m ago`;
-  const h = Math.floor(mins / 60);
-  return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
-}
-function minutesSince(iso) { return (Date.now() - new Date(iso).getTime()) / 60000; }
-function stripQuotes(s) { return (s || '').replace(/^[“"']|[”"']$/g, ''); }
+function fmt(n) { return (n || 0).toLocaleString(); }
+function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+function initials(name) { return (name || '?').replace(/[^a-zA-Z ]/g, '').trim().slice(0, 2).toUpperCase() || '?'; }
+function titleCase(s) { return String(s).replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1)); }
+function now() { return new Date().toISOString(); }
+function relTime(iso) { const m = (Date.now() - new Date(iso).getTime()) / 60000; if (m < 1) return 'just now'; if (m < 60) return `${Math.round(m)}m ago`; const h = Math.floor(m / 60); return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`; }
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }

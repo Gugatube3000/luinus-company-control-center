@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#05080f" />
-    <title>Luinus · Company Control Center</title>
+    <title>Luinus · Growth Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -16,24 +16,23 @@
     <div class="bg-grid"></div>
 
     <div class="app">
-      <!-- ===== Sidebar ===== -->
       <aside class="sidebar">
         <div class="brand">
           <div class="brand-mark">L</div>
           <div class="brand-text">
             <div class="brand-name">Luinus</div>
-            <div class="brand-sub">Control Center</div>
+            <div class="brand-sub">Growth Engine</div>
           </div>
         </div>
 
         <nav class="nav" id="nav">
-          <button class="nav-item" data-view="mission"><span class="nav-ico">◎</span> Mission Control</button>
-          <button class="nav-item" data-view="kanban"><span class="nav-ico">▦</span> Kanban Board</button>
-          <button class="nav-item" data-view="agents"><span class="nav-ico">⬡</span> Agents</button>
-          <button class="nav-item" data-view="queue"><span class="nav-ico">≡</span> Execution Queue</button>
-          <button class="nav-item" data-view="decisions"><span class="nav-ico">✶</span> Decisions <span class="nav-count" id="navDecisions"></span></button>
-          <button class="nav-item" data-view="alerts"><span class="nav-ico">⚠</span> Alerts <span class="nav-count danger" id="navAlerts"></span></button>
-          <button class="nav-item" data-view="souls"><span class="nav-ico">✦</span> Agent Souls</button>
+          <button class="nav-item" data-view="command"><span class="nav-ico">◎</span> Command</button>
+          <button class="nav-item" data-view="campaigns"><span class="nav-ico">🚀</span> Campaigns <span class="nav-count" id="navCampaigns"></span></button>
+          <button class="nav-item" data-view="pipeline"><span class="nav-ico">▦</span> Pipeline</button>
+          <button class="nav-item" data-view="inbox"><span class="nav-ico">✶</span> Inbox <span class="nav-count danger" id="navInbox"></span></button>
+          <button class="nav-item" data-view="playbooks"><span class="nav-ico">📘</span> Playbooks</button>
+          <button class="nav-item" data-view="team"><span class="nav-ico">⬡</span> Teams</button>
+          <button class="nav-item" data-view="souls"><span class="nav-ico">✦</span> Souls</button>
         </nav>
 
         <div class="autopilot">
@@ -44,49 +43,45 @@
             </div>
             <button class="toggle" id="autopilotToggle" role="switch" aria-checked="false"><span></span></button>
           </div>
-          <p class="autopilot-note">Agents advance the company loop on their own while you're away.</p>
+          <p class="autopilot-note">The team keeps sending and booking while you're away.</p>
         </div>
 
         <div class="sidebar-foot">
           <div class="status-dot live"></div>
-          <span id="sidebarStatus">Company live · seeded state</span>
+          <span id="sidebarStatus">Outreach live · seeded</span>
         </div>
       </aside>
 
-      <!-- ===== Main ===== -->
       <main class="main">
         <header class="topbar">
           <div class="topbar-left">
-            <h1 id="viewTitle">Mission Control</h1>
-            <p id="viewSubtitle" class="topbar-sub">What the company is doing right now — and what needs your call.</p>
+            <h1 id="viewTitle">Command</h1>
+            <p id="viewSubtitle" class="topbar-sub">Tell the team what to do — and see what's already working.</p>
           </div>
           <div class="topbar-actions">
-            <span class="pill pill-live" id="cadencePill">Loop · 30m</span>
             <span class="pill" id="clockPill">—</span>
             <button class="btn btn-ghost" id="exportBtn">Export snapshot</button>
-            <button class="btn btn-primary" id="refreshBtn">↻ Refresh cycle</button>
+            <button class="btn btn-primary" id="refreshBtn">↻ Refresh</button>
           </div>
         </header>
 
         <div class="view-scroll">
-          <section class="view" id="view-mission"></section>
-          <section class="view" id="view-kanban"></section>
-          <section class="view" id="view-agents"></section>
-          <section class="view" id="view-queue"></section>
-          <section class="view" id="view-decisions"></section>
-          <section class="view" id="view-alerts"></section>
+          <section class="view" id="view-command"></section>
+          <section class="view" id="view-campaigns"></section>
+          <section class="view" id="view-pipeline"></section>
+          <section class="view" id="view-inbox"></section>
+          <section class="view" id="view-playbooks"></section>
+          <section class="view" id="view-team"></section>
           <section class="view" id="view-souls"></section>
         </div>
       </main>
     </div>
 
-    <!-- ===== Drill-down drawer ===== -->
     <div class="drawer-backdrop" id="drawerBackdrop"></div>
     <aside class="drawer" id="drawer" aria-hidden="true">
       <div class="drawer-inner" id="drawerInner"></div>
     </aside>
 
-    <!-- ===== Toast ===== -->
     <div class="toast" id="toast"></div>
 
     <script src="./data.js"></script>

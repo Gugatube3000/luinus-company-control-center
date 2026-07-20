@@ -1,177 +1,332 @@
-/* Luinus Company Control Center — seed data
- * One source of truth. Tasks power both the Execution Queue and the Kanban board.
- * Everything here is realistic mock state, structured so it can be swapped for
- * real agent telemetry later without touching the UI.
+/* Luinus Growth Engine — seed data
+ * A focused, automated outreach team for booking doctor demos.
+ * Channels: cold email (volume) + LinkedIn DMs. No code, no product ops.
+ * Realistic mock state, structured to swap for live data later.
  */
 
 const SEED = {
   meta: {
     company: 'Luinus AI',
-    cadence: '30m',
     autopilot: false,
-    sortByPriority: false,
     lastRefresh: new Date().toISOString(),
     startedAt: new Date().toISOString(),
+    // Daily outreach goals the team works toward 24/7.
+    goals: { emailsPerDay: 1000, dmsPerDay: 100, leadsPerDay: 300, callsPerDay: 5 },
   },
 
-  // ----- Agents -------------------------------------------------------------
+  // ----- Teams (switchable departments) -------------------------------------
+  teams: [
+    { id: 'outreach', name: 'Outreach Team', tagline: 'Books doctor demos via cold email + LinkedIn.', focus: 'Pipeline & revenue' },
+    { id: 'marketing', name: 'Marketing Team', tagline: 'Builds trust and warms the audience before outreach lands.', focus: 'Authority & demand' },
+    { id: 'operations', name: 'Operations Team', tagline: 'Keeps the engine clean, compliant, and measured.', focus: 'Systems & deliverability' },
+  ],
+
+  // ----- The agents, grouped by team ----------------------------------------
   agents: [
     {
-      id: 'coo', name: 'COO / Orchestrator', codename: 'Atlas', role: 'Company brain',
-      lane: 'Orchestration', status: 'live', confidence: 0.93, progress: 72,
-      mission: 'Coordinate the company loop and unblock the founder.',
-      next: 'Run the morning review and push decisions downstream.',
-      lastRun: minsAgo(4), blocker: null, soul: 'souls/coo.md',
-      tools: ['Execution Queue', 'Agent roster', 'Decisions panel', 'Activity stream', 'Alerts'],
+      id: 'scout', name: 'Lead Researcher', codename: 'Scout', role: 'Builds the lists',
+      lane: 'Leads', team: 'outreach', status: 'live', confidence: 0.86, progress: 64,
+      mission: 'Find and verify the right doctors to reach — ICP, specialty, geo.',
+      next: 'Source 300 ER physicians and enrich with verified emails + LinkedIn.',
+      lastRun: minsAgo(6), blocker: null, soul: 'souls/scout.md',
+      tools: ['Apollo / Clay (data)', 'Email verification', 'LinkedIn Sales Navigator', 'ICP filters'],
       io: {
-        inputs: 'Full company state, blocker signals, founder decisions.',
-        outputs: 'Re-ranked queue, agent pokes, founder decision briefs.',
-        errors: 'None this cycle.',
+        inputs: 'Target ICP (specialty, title, geo, org size).',
+        outputs: 'Verified lead lists (name, title, org, email, LinkedIn).',
+        errors: 'None. 250 sourced leads awaiting your approval.',
       },
     },
     {
-      id: 'sales', name: 'Sales Agent', codename: 'Closer', role: 'Pipeline owner',
-      lane: 'Revenue', status: 'blocked', confidence: 0.61, progress: 53,
-      mission: 'Move conversations toward paid pilots.',
-      next: 'Prepare Dr. Otero follow-up and objection handling.',
-      lastRun: minsAgo(22), blocker: 'Needs approved pilot pricing before next call.', soul: 'souls/sales.md',
-      tools: ['Pipeline tasks', 'Marketing handoff', 'Product handoff', 'Decisions panel'],
+      id: 'scribe', name: 'Copywriter', codename: 'Scribe', role: 'Writes the messages',
+      lane: 'Copy', team: 'outreach', status: 'waiting', confidence: 0.81, progress: 48,
+      mission: 'Write short, personalized sequences that get replies — not spam.',
+      next: 'Draft the 4-step ER cold-email sequence + 2 subject-line variants.',
+      lastRun: minsAgo(14), blocker: null, soul: 'souls/scribe.md',
+      tools: ['Sequence builder', 'Personalization tokens', 'A/B variants', 'Spam-word check'],
       io: {
-        inputs: 'Qualified leads, prospect objections, product capability notes.',
-        outputs: 'Booked calls, follow-up drafts, pricing decision requests.',
-        errors: 'Blocked: cannot quote pricing the founder has not approved.',
+        inputs: 'Offer, ICP pain, proof points, channel.',
+        outputs: 'Email + DM sequences with personalization, ready for approval.',
+        errors: 'Waiting on your sign-off for the ER sequence copy.',
       },
     },
     {
-      id: 'marketing', name: 'Marketing Agent', codename: 'Signal', role: 'Top of funnel',
-      lane: 'Revenue', status: 'live', confidence: 0.78, progress: 41,
-      mission: 'Create trust and distribution.',
-      next: 'Draft founder post batch and refine positioning.',
-      lastRun: minsAgo(11), blocker: null, soul: 'souls/marketing.md',
-      tools: ['Content tasks', 'Positioning doc', 'QA handoff', 'Research handoff'],
+      id: 'mailer', name: 'Email Outreach', codename: 'Mailer', role: 'Sends cold email at volume',
+      lane: 'Email', team: 'outreach', status: 'live', confidence: 0.74, progress: 71,
+      mission: 'Run cold email across warmed inboxes — at volume, in the inbox.',
+      next: 'Push the Hospitalist sequence and keep deliverability green.',
+      lastRun: minsAgo(2), blocker: null, soul: 'souls/mailer.md',
+      tools: ['Instantly / Smartlead', 'Inbox rotation', 'Warmup', 'Follow-up automation'],
       io: {
-        inputs: 'Positioning, what converts (from Sales), competitive language.',
-        outputs: 'Approvable post drafts, refreshed positioning, claims for QA.',
-        errors: 'None. One claim awaiting QA verification.',
+        inputs: 'Approved sequence + verified list + warmed inboxes.',
+        outputs: 'Sends, opens, replies routed to the Closer.',
+        errors: 'ER campaign still warming (9 days left) — cannot send yet.',
       },
     },
     {
-      id: 'product', name: 'Product Agent', codename: 'Forge', role: 'Roadmap owner',
-      lane: 'Product', status: 'live', confidence: 0.88, progress: 88,
-      mission: 'Ship the wedge that closes revenue.',
-      next: 'Finish MDM section v1 and prepare demo copy.',
-      lastRun: minsAgo(2), blocker: null, soul: 'souls/product.md',
-      tools: ['Build tasks', 'Scope doc', 'QA handoff', 'Sales handoff', 'Decisions panel'],
+      id: 'connector', name: 'LinkedIn / DM', codename: 'Connector', role: 'Sends DMs',
+      lane: 'LinkedIn', team: 'outreach', status: 'live', confidence: 0.7, progress: 55,
+      mission: 'Warm up, connect, and DM decision-makers without getting flagged.',
+      next: 'Pre-engage 40 Medical Directors, then send 80 connect + DM.',
+      lastRun: minsAgo(9), blocker: null, soul: 'souls/connector.md',
+      tools: ['HeyReach / Expandi', 'Sales Navigator', 'Pre-engagement', 'Connection + DM steps'],
       io: {
-        inputs: 'Prospect pain (from Sales), scope decision, QA findings.',
-        outputs: 'Demoable MDM slice, capability notes, scope tradeoff for founder.',
-        errors: 'None. Export sub-feature pending scope call.',
+        inputs: 'Approved DM sequence + targeted LinkedIn list.',
+        outputs: 'Connections, DMs sent, replies routed to the Closer.',
+        errors: 'None. Holding to ~80/day to stay safe.',
       },
     },
     {
-      id: 'ops', name: 'Ops / Compliance Agent', codename: 'Anchor', role: 'Risk reducer',
-      lane: 'Operations', status: 'idle', confidence: 0.82, progress: 34,
-      mission: 'Keep the company compliant and calm.',
-      next: 'Update provenance checklist and decision log.',
-      lastRun: minsAgo(38), blocker: null, soul: 'souls/ops.md',
-      tools: ['Decision log', 'Provenance checklist', 'Risk flags', 'Handoff review'],
+      id: 'closer', name: 'Reply & Booking', codename: 'Closer', role: 'Books the calls',
+      lane: 'Pipeline', team: 'outreach', status: 'blocked', confidence: 0.66, progress: 42,
+      mission: 'Answer fast, handle objections, and get demos on the calendar.',
+      next: 'Reply to Dr. Otero and book; handle the HIPAA objection.',
+      lastRun: minsAgo(11), blocker: 'Needs your approval on the Otero reply + a HIPAA answer.',
+      soul: 'souls/closer.md',
+      tools: ['Unified inbox', 'Calendar / scheduler', 'Objection library', 'CRM update'],
       io: {
-        inputs: 'Outgoing claims, data flows, founder decisions to log.',
-        outputs: 'Updated decision log, provenance checks, risk flags.',
-        errors: 'Two public claims currently untraced — flagged.',
+        inputs: 'Replies from email + LinkedIn.',
+        outputs: 'Booked demos, qualified leads, objection responses.',
+        errors: 'Blocked: 2 replies need a human decision.',
       },
     },
     {
-      id: 'qa', name: 'QA / Review Agent', codename: 'Sentinel', role: 'Gatekeeper',
-      lane: 'Quality', status: 'live', confidence: 0.74, progress: 67,
-      mission: 'Stop bad claims and broken UX before they ship.',
-      next: 'Audit public claims and verify the latest demo.',
-      lastRun: minsAgo(7), blocker: null, soul: 'souls/qa.md',
-      tools: ['Review queue', 'Claims audit', 'Demo verification', 'Alerts'],
+      id: 'pulse', name: 'Marketing / Content', codename: 'Pulse', role: 'Warms the audience',
+      lane: 'Marketing', team: 'marketing', status: 'idle', confidence: 0.78, progress: 33,
+      mission: 'Build founder authority so cold outreach lands warmer.',
+      next: 'Draft a founder post batch on ER documentation pain.',
+      lastRun: minsAgo(41), blocker: null, soul: 'souls/pulse.md',
+      tools: ['Content calendar', 'Founder voice', 'Proof / case angles', 'Engagement'],
       io: {
-        inputs: 'Builds from Product, claims from Marketing.',
-        outputs: 'PASS / BLOCK verdicts with reasons, verified demos.',
-        errors: 'One claim ("clinically validated") blocked — no source.',
+        inputs: 'Wins, proof points, what converts in outreach.',
+        outputs: 'Founder posts that build trust and lift reply rates.',
+        errors: 'None. Post batch pending review.',
       },
     },
     {
-      id: 'research', name: 'Research Agent', codename: 'Scout', role: 'Signal watcher',
-      lane: 'Research', status: 'idle', confidence: 0.7, progress: 28,
-      mission: 'Watch competitors and tools without noise.',
-      next: 'Scan new launches and summarize opportunities.',
-      lastRun: minsAgo(54), blocker: null, soul: 'souls/research.md',
-      tools: ['Web search / fetch', 'Competitive scan', 'Research briefs', 'Decisions panel'],
+      id: 'echo', name: 'Social & Engagement', codename: 'Echo', role: 'Warms the audience',
+      lane: 'Social', team: 'marketing', status: 'live', confidence: 0.72, progress: 38,
+      mission: 'Engage target accounts so cold DMs land on a familiar name.',
+      next: 'React + comment on 20 target doctors’ posts; reshare a founder win.',
+      lastRun: minsAgo(16), blocker: null, soul: 'souls/echo.md',
+      tools: ['Engagement automation', 'Founder profile', 'Comment library', 'Social listening'],
       io: {
-        inputs: 'Watchlist of competitors, tools, and market trends.',
-        outputs: 'Sourced briefs ending in a recommendation.',
-        errors: 'None. One brief pending on a new entrant.',
+        inputs: 'Connector’s target list, founder wins, trending clinical topics.',
+        outputs: 'Warmed target accounts, higher DM reply rates, community presence.',
+        errors: 'None. Engaging today’s Medical Director list.',
       },
     },
     {
-      id: 'support', name: 'Customer Success Agent', codename: 'Harbor', role: 'Retention owner',
-      lane: 'Customer', status: 'waiting', confidence: 0.8, progress: 46,
-      mission: 'Make existing customers successful and vocal.',
-      next: 'Draft proactive pilot check-in and file feedback to Product.',
-      lastRun: minsAgo(29), blocker: null, soul: 'souls/support.md',
-      tools: ['Customer tasks', 'Product handoff', 'Sales handoff', 'Ops handoff'],
+      id: 'lens', name: 'Market Research', codename: 'Lens', role: 'Finds what converts',
+      lane: 'Research', team: 'marketing', status: 'idle', confidence: 0.75, progress: 26,
+      mission: 'Track competitor messaging and the exact words doctors use.',
+      next: 'Summarize 3 competitor angles + 5 phrases doctors actually say.',
+      lastRun: minsAgo(63), blocker: null, soul: 'souls/lens.md',
+      tools: ['Web research', 'Competitor watch', 'Message mining', 'ICP insights'],
       io: {
-        inputs: 'Pilot account health, open issues, customer feedback.',
-        outputs: 'Proactive check-ins, filed bugs with repro, churn-risk flags.',
-        errors: 'Waiting on Product to confirm one fix before replying.',
+        inputs: 'Competitors, reviews, forums, what’s replying in outreach.',
+        outputs: 'Sourced insights + phrases fed to Scribe and Pulse.',
+        errors: 'None. Competitor teardown pending.',
+      },
+    },
+    {
+      id: 'anchor', name: 'Deliverability & Compliance', codename: 'Anchor', role: 'Keeps it landing & legal',
+      lane: 'Infra', team: 'operations', status: 'live', confidence: 0.83, progress: 60,
+      mission: 'Protect deliverability and keep outreach CAN-SPAM / HIPAA-safe.',
+      next: 'Watch domain health, bounce rate, and process opt-outs.',
+      lastRun: minsAgo(18), blocker: null, soul: 'souls/anchor.md',
+      tools: ['Domain health (SPF/DKIM/DMARC)', 'Bounce monitor', 'Opt-out handling', 'Spam-placement tests'],
+      io: {
+        inputs: 'Sending volume, bounces, spam-placement tests, domains.',
+        outputs: 'Green deliverability, suppression list, compliance flags.',
+        errors: 'Bounce rate 2.1% (safe, <3%). One domain needs DMARC.',
+      },
+    },
+    {
+      id: 'atlas', name: 'Operations Lead', codename: 'Atlas', role: 'Coordinates the teams',
+      lane: 'Orchestration', team: 'operations', status: 'live', confidence: 0.9, progress: 68,
+      mission: 'Keep every team aligned, unblock the founder, surface the next decision.',
+      next: 'Run the cross-team standup and route today’s blockers.',
+      lastRun: minsAgo(4), blocker: null, soul: 'souls/atlas.md',
+      tools: ['Cross-team queue', 'Daily standup', 'Decision routing', 'Reporting'],
+      io: {
+        inputs: 'Every team’s status, blockers, and open decisions.',
+        outputs: 'Aligned priorities, routed blockers, a clear founder inbox.',
+        errors: 'None. 2 items routed to your inbox.',
+      },
+    },
+    {
+      id: 'ledger', name: 'RevOps / CRM', codename: 'Ledger', role: 'Keeps the data clean',
+      lane: 'RevOps', team: 'operations', status: 'idle', confidence: 0.84, progress: 44,
+      mission: 'Keep the CRM clean and the numbers honest — dedupe, log, report.',
+      next: 'Dedupe new leads, sync pipeline stages, post the weekly numbers.',
+      lastRun: minsAgo(34), blocker: null, soul: 'souls/ledger.md',
+      tools: ['CRM hygiene', 'Dedupe', 'Pipeline reporting', 'Scheduling'],
+      io: {
+        inputs: 'Leads, campaign stats, pipeline stages, meetings.',
+        outputs: 'Clean CRM, deduped leads, weekly performance report.',
+        errors: 'None. 6 duplicate leads merged today.',
       },
     },
   ],
 
-  // ----- Tasks (power Queue + Kanban) ---------------------------------------
-  // stage: backlog | in_progress | blocked | review | shipped
-  tasks: [
-    { id: 'q1', title: 'Dr. Otero follow-up', detail: 'Close momentum and book the next conversation.', lane: 'Revenue', owner: 'sales', priority: 'P0', stage: 'blocked', deps: ['Pilot pricing decision'], dueIn: 1, notes: 'Blocked on founder pricing call.' },
-    { id: 'q2', title: 'Ship MDM section v1', detail: 'Core wedge for emergency medicine.', lane: 'Product', owner: 'product', priority: 'P0', stage: 'in_progress', deps: [], dueIn: 2, notes: '88% — demoable, export pending scope.' },
-    { id: 'q3', title: 'Founder LinkedIn post batch', detail: 'Trust and top-of-funnel.', lane: 'Revenue', owner: 'marketing', priority: 'P1', stage: 'in_progress', deps: ['QA claim check'], dueIn: 3, notes: 'Drafting batch of 5.' },
-    { id: 'q4', title: 'Compliance / provenance checklist', detail: 'Reduce risk before scale.', lane: 'Operations', owner: 'ops', priority: 'P1', stage: 'backlog', deps: [], dueIn: 4, notes: 'Two untraced claims to resolve.' },
-    { id: 'q5', title: 'Public claims sanity check', detail: 'Avoid overpromising.', lane: 'Quality', owner: 'qa', priority: 'P1', stage: 'review', deps: [], dueIn: 2, notes: '1 of 3 claims blocked — needs source.' },
-    { id: 'q6', title: 'Competitive scan + tool watch', detail: 'Sharper decisions.', lane: 'Research', owner: 'research', priority: 'P2', stage: 'backlog', deps: [], dueIn: 5, notes: 'New entrant brief in progress.' },
-    { id: 'q7', title: 'Demo script for MDM wedge', detail: 'What Sales shows a prospect.', lane: 'Product', owner: 'product', priority: 'P1', stage: 'review', deps: ['Ship MDM section v1'], dueIn: 3, notes: 'Verifying flow with QA.' },
-    { id: 'q8', title: 'Pilot account check-in', detail: 'Keep the existing pilot healthy.', lane: 'Customer', owner: 'support', priority: 'P1', stage: 'in_progress', deps: [], dueIn: 2, notes: 'Proactive touch + feedback to Product.' },
-    { id: 'q9', title: 'Positioning v2 (integration story)', detail: 'Lead with the moat Research found.', lane: 'Revenue', owner: 'marketing', priority: 'P2', stage: 'backlog', deps: ['Competitive scan + tool watch'], dueIn: 6, notes: 'Pending research brief.' },
-    { id: 'q10', title: 'Decision log reconciliation', detail: 'Company memory stays auditable.', lane: 'Operations', owner: 'ops', priority: 'P2', stage: 'backlog', deps: [], dueIn: 5, notes: 'Routine overnight task.' },
-    { id: 'q11', title: 'Objection handling pack', detail: 'Top 3 objections + evidence.', lane: 'Revenue', owner: 'sales', priority: 'P1', stage: 'in_progress', deps: [], dueIn: 2, notes: 'For the Otero call.' },
-    { id: 'q12', title: 'New entrant teardown brief', detail: 'So-what: harden integration story.', lane: 'Research', owner: 'research', priority: 'P2', stage: 'review', deps: [], dueIn: 4, notes: 'Sourced, pending recommendation polish.' },
-    { id: 'q13', title: 'Onboard checklist for pilots', detail: 'Make pilot success repeatable.', lane: 'Customer', owner: 'support', priority: 'P2', stage: 'shipped', deps: [], dueIn: 0, notes: 'Shipped v1.' },
-    { id: 'q14', title: 'Hero claim verification', detail: 'Every public number is sourced.', lane: 'Quality', owner: 'qa', priority: 'P0', stage: 'blocked', deps: ['Provenance from Ops'], dueIn: 1, notes: 'Blocked: source missing.' },
+  // ----- Outreach campaigns -------------------------------------------------
+  // channel: email | linkedin | content ; status: draft | warming | live | paused
+  campaigns: [
+    {
+      id: 'c1', name: 'ER Physicians — Cold Email', channel: 'email', owner: 'mailer',
+      icp: 'Emergency medicine physicians, US', goalPerDay: 1000, status: 'warming',
+      sentToday: 0, totalSent: 0, replies: 0, booked: 0,
+      infra: { domains: 10, inboxes: 50, warmDaysLeft: 9 },
+      steps: [
+        { day: 1, type: 'email', label: 'Problem + benefit (1 line each)' },
+        { day: 3, type: 'email', label: 'Proof / quick case' },
+        { day: 6, type: 'email', label: 'Short bump' },
+        { day: 10, type: 'email', label: 'Breakup' },
+      ],
+      createdAt: minsAgo(2880),
+    },
+    {
+      id: 'c2', name: 'Medical Directors — LinkedIn', channel: 'linkedin', owner: 'connector',
+      icp: 'ER / Hospitalist Medical Directors', goalPerDay: 80, status: 'live',
+      sentToday: 32, totalSent: 540, replies: 21, booked: 3,
+      infra: null,
+      steps: [
+        { day: 0, type: 'engage', label: 'React + comment on 2 posts' },
+        { day: 2, type: 'connect', label: 'Connect with a 1-line note' },
+        { day: 3, type: 'dm', label: 'Value DM + soft CTA' },
+        { day: 6, type: 'dm', label: 'Follow-up DM' },
+      ],
+      createdAt: minsAgo(7200),
+    },
+    {
+      id: 'c3', name: 'Hospitalist — Email Sequence', channel: 'email', owner: 'mailer',
+      icp: 'Hospitalist leads, 200+ bed hospitals', goalPerDay: 400, status: 'live',
+      sentToday: 180, totalSent: 3200, replies: 74, booked: 6,
+      infra: { domains: 5, inboxes: 25, warmDaysLeft: 0 },
+      steps: [
+        { day: 1, type: 'email', label: 'Pain + 1-line offer' },
+        { day: 4, type: 'email', label: 'Case study' },
+        { day: 8, type: 'email', label: 'Breakup' },
+      ],
+      createdAt: minsAgo(10080),
+    },
+    {
+      id: 'c4', name: 'ICU Directors — Multichannel', channel: 'linkedin', owner: 'connector',
+      icp: 'ICU / Critical Care Directors', goalPerDay: 60, status: 'draft',
+      sentToday: 0, totalSent: 0, replies: 0, booked: 0, infra: null,
+      steps: [
+        { day: 0, type: 'engage', label: 'Pre-engage' },
+        { day: 2, type: 'connect', label: 'Connect + note' },
+        { day: 3, type: 'dm', label: 'Value DM' },
+      ],
+      createdAt: minsAgo(120),
+    },
   ],
 
-  // ----- Founder decisions --------------------------------------------------
-  decisions: [
-    { id: 'd1', title: 'Pricing for the pilot?', detail: 'Decide the pilot structure before a prospect asks. Sales is blocked on this.', owner: 'Founder', urgency: 'high', requestedBy: 'sales', status: 'open' },
-    { id: 'd2', title: 'What ships in MDM v1?', detail: 'Cut the export → ship Friday. Keep it → slip a week. Product needs the call.', owner: 'Founder', urgency: 'high', requestedBy: 'product', status: 'open' },
-    { id: 'd3', title: 'Which proof point goes public?', detail: 'Any claim touching performance needs founder sign-off. QA has two candidates.', owner: 'Founder', urgency: 'medium', requestedBy: 'qa', status: 'open' },
-    { id: 'd4', title: 'Build vs. partner on integrations?', detail: 'Research flags a new entrant; integration is the moat. Strategic fork.', owner: 'Founder', urgency: 'low', requestedBy: 'research', status: 'open' },
+  // ----- Leads (pipeline) ---------------------------------------------------
+  // stage: sourced | contacted | replied | booked | won | passed
+  leads: [
+    { id: 'l1', name: 'Dr. Otero', title: 'ER Attending', org: 'Valley Medical', specialty: 'Emergency', geo: 'TX', channel: 'email', campaignId: 'c3', stage: 'replied', note: 'Asked for info — wants integration detail.' },
+    { id: 'l2', name: 'Dr. Nguyen', title: 'Medical Director, ED', org: 'Mercy Health', specialty: 'Emergency', geo: 'CA', channel: 'linkedin', campaignId: 'c2', stage: 'booked', note: 'Demo booked Thursday 2pm.' },
+    { id: 'l3', name: 'Dr. Patel', title: 'Hospitalist Lead', org: 'St. Luke’s', specialty: 'Hospital Med', geo: 'IL', channel: 'email', campaignId: 'c3', stage: 'replied', note: 'Positive — asked about pricing.' },
+    { id: 'l4', name: 'Dr. Roberts', title: 'CMO', org: 'Northside', specialty: 'Admin', geo: 'GA', channel: 'linkedin', campaignId: 'c2', stage: 'contacted', note: 'Connected, DM sent.' },
+    { id: 'l5', name: 'Dr. Kim', title: 'ICU Director', org: 'Harbor General', specialty: 'Critical Care', geo: 'WA', channel: 'linkedin', campaignId: 'c2', stage: 'contacted', note: 'Pre-engaged, connect pending.' },
+    { id: 'l6', name: 'Dr. Alvarez', title: 'ER Attending', org: 'Sunrise', specialty: 'Emergency', geo: 'FL', channel: 'email', campaignId: 'c3', stage: 'sourced', note: 'Verified, queued.' },
+    { id: 'l7', name: 'Dr. Chen', title: 'Hospitalist', org: 'Metro Health', specialty: 'Hospital Med', geo: 'NY', channel: 'email', campaignId: 'c3', stage: 'sourced', note: 'Verified, queued.' },
+    { id: 'l8', name: 'Dr. Davis', title: 'Medical Director', org: 'Lakeside', specialty: 'Emergency', geo: 'OH', channel: 'linkedin', campaignId: 'c2', stage: 'won', note: 'Pilot agreed 🎉' },
+    { id: 'l9', name: 'Dr. Singh', title: 'ER Attending', org: 'Cedar Clinic', specialty: 'Emergency', geo: 'AZ', channel: 'email', campaignId: 'c3', stage: 'passed', note: 'Not now — no budget.' },
+    { id: 'l10', name: 'Dr. Wright', title: 'Hospitalist Lead', org: 'Grandview', specialty: 'Hospital Med', geo: 'NC', channel: 'email', campaignId: 'c3', stage: 'contacted', note: 'Opened 3x, no reply yet.' },
   ],
 
-  // ----- Alerts / blockers --------------------------------------------------
-  // severity: critical | warn | info
-  alerts: [
-    { id: 'al1', type: 'Blocked lane', title: 'Sales is blocked on pricing', detail: 'Otero follow-up cannot proceed without approved pilot pricing.', severity: 'critical', relatedId: 'sales' },
-    { id: 'al2', type: 'Unverified claim', title: '“Clinically validated” has no source', detail: 'QA blocked the claim. It cannot ship and needs founder review.', severity: 'critical', relatedId: 'qa' },
-    { id: 'al3', type: 'Provenance gap', title: 'Two public claims untraced', detail: 'Ops flagged claims without a traceable source ahead of the post batch.', severity: 'warn', relatedId: 'ops' },
-    { id: 'al4', type: 'Stale agent', title: 'Research idle for ~54m', detail: 'Watchlist scan is overdue; the entrant brief is waiting.', severity: 'warn', relatedId: 'research' },
-    { id: 'al5', type: 'Waiting on handoff', title: 'Support waiting on Product', detail: 'Cannot confirm a fix to the customer until Product replies.', severity: 'info', relatedId: 'support' },
+  // ----- Inbox: replies & approvals that need YOU ---------------------------
+  // type: reply | approve-copy | approve-leads | book | objection
+  inbox: [
+    { id: 'i1', type: 'reply', title: 'Dr. Otero replied', detail: '“Interested — how does it fit our EHR workflow?” Closer drafted a reply; approve to send.', leadId: 'l1', urgency: 'high', status: 'open' },
+    { id: 'i2', type: 'objection', title: 'HIPAA question from Dr. Roberts', detail: '“Is this HIPAA compliant and where is data stored?” Needs an approved answer before Closer replies.', leadId: 'l4', urgency: 'high', status: 'open' },
+    { id: 'i3', type: 'approve-copy', title: 'Approve ER cold-email sequence', detail: 'Scribe drafted the 4-step ER sequence. Approve so Mailer can launch once inboxes finish warming.', campaignId: 'c1', urgency: 'medium', status: 'open' },
+    { id: 'i4', type: 'approve-leads', title: 'Approve 250 sourced ER leads', detail: 'Scout verified 250 ER physicians (bounce-checked). Approve to load into the ER campaign.', campaignId: 'c1', urgency: 'medium', status: 'open' },
+    { id: 'i5', type: 'book', title: 'Dr. Patel wants pricing + a call', detail: 'Closer can offer two slots. Confirm pilot pricing so it can book.', leadId: 'l3', urgency: 'medium', status: 'open' },
   ],
 
   // ----- Activity stream ----------------------------------------------------
   activity: [
-    { id: 'a1', time: minsAgo(4), actor: 'Atlas (COO)', type: 'orchestration', message: 'Prioritized the revenue lane and surfaced the pricing decision.' },
-    { id: 'a2', time: minsAgo(2), actor: 'Forge (Product)', type: 'product', message: 'Moved MDM v1 to near-shippable (88%).' },
-    { id: 'a3', time: minsAgo(7), actor: 'Sentinel (QA)', type: 'quality', message: 'Blocked “clinically validated” claim — no source.' },
-    { id: 'a4', time: minsAgo(22), actor: 'Closer (Sales)', type: 'revenue', message: 'Drafted Otero follow-up; blocked pending pricing.' },
-    { id: 'a5', time: minsAgo(38), actor: 'Anchor (Ops)', type: 'operations', message: 'Flagged two untraced public claims.' },
-    { id: 'a6', time: minsAgo(54), actor: 'Scout (Research)', type: 'research', message: 'Spotted a new entrant; teardown brief in progress.' },
+    { id: 'a1', time: minsAgo(2), actor: 'Mailer (Email)', type: 'email', message: 'Sent 180 hospitalist emails today · 41% open · 7 replies.' },
+    { id: 'a2', time: minsAgo(9), actor: 'Connector (LinkedIn)', type: 'linkedin', message: 'Sent 32 DMs to Medical Directors · 6 replies.' },
+    { id: 'a3', time: minsAgo(11), actor: 'Closer (Pipeline)', type: 'pipeline', message: 'Booked a demo with Dr. Nguyen (Thu 2pm).' },
+    { id: 'a4', time: minsAgo(18), actor: 'Anchor (Infra)', type: 'infra', message: 'Deliverability green · bounce 2.1% · 1 domain needs DMARC.' },
+    { id: 'a5', time: minsAgo(6), actor: 'Scout (Leads)', type: 'leads', message: 'Sourced + verified 250 ER physicians — awaiting approval.' },
+  ],
+
+  // ----- Playbooks (research-backed, one-click deployable) -------------------
+  playbooks: [
+    {
+      id: 'p1', title: '1,000 cold emails/day — infrastructure', channel: 'email',
+      summary: 'The setup that lets you send 1,000/day and still land in the inbox.',
+      steps: [
+        '~10 sending domains (never your primary; use .com/.co/.io/.net).',
+        '~50 inboxes (≈5 per domain), each sending ~20/day.',
+        'Warm every new inbox 2–4 weeks before real sends.',
+        'SPF + DKIM + DMARC on every domain.',
+        'Verified lists only — keep bounce under 3%.',
+        'Inbox rotation + stop sending to unengaged contacts.',
+      ],
+      deploy: { name: 'ER Physicians — Cold Email', channel: 'email', goalPerDay: 1000 },
+      tags: ['email', 'deliverability', 'volume'],
+    },
+    {
+      id: 'p2', title: '4-step cold email sequence (doctors)', channel: 'email',
+      summary: 'Short, benefit-led, personalized. Built for busy clinicians.',
+      steps: [
+        'Day 1 — one line of pain, one line of benefit, soft ask.',
+        'Day 3 — a quick proof point or mini case.',
+        'Day 6 — short bump (“worth a look?”).',
+        'Day 10 — breakup (“should I close this out?”).',
+      ],
+      deploy: { name: 'Doctor Email Sequence', channel: 'email', goalPerDay: 400 },
+      tags: ['email', 'copy'],
+    },
+    {
+      id: 'p3', title: 'LinkedIn DM sequence (Medical Directors)', channel: 'linkedin',
+      summary: 'Warm first, then connect and DM. ~80/day to stay safe.',
+      steps: [
+        'Day 0 — react + comment on 2 of their posts.',
+        'Day 2 — connect with a 1-line, specific note.',
+        'Day 3 — value DM + soft CTA (no pitch wall).',
+        'Day 6 — one follow-up, then stop.',
+        'Use Sales Navigator filters: title, specialty, org size.',
+      ],
+      deploy: { name: 'Medical Directors — LinkedIn', channel: 'linkedin', goalPerDay: 80 },
+      tags: ['linkedin', 'copy'],
+    },
+    {
+      id: 'p4', title: 'Reply → booked demo', channel: 'pipeline',
+      summary: 'Turn a reply into a calendar invite. Speed wins.',
+      steps: [
+        'Reply within the hour while interest is hot.',
+        'One qualifying question, then offer two specific slots.',
+        'Objection “HIPAA?” → lead with compliance + data location.',
+        'Objection “no time” → 12-min demo, their workflow only.',
+        'Always confirm with a calendar invite, not a “let me know”.',
+      ],
+      deploy: null,
+      tags: ['pipeline', 'closing'],
+    },
+    {
+      id: 'p5', title: 'Deliverability checklist', channel: 'email',
+      summary: 'Stay out of spam at volume.',
+      steps: [
+        'Warm new mailboxes 2–4 weeks before sending.',
+        'Test inbox placement before each launch.',
+        'Rotate inboxes; cap ~20/inbox/day.',
+        'Suppress bounces and unengaged contacts.',
+        'Monitor domain health continuously.',
+      ],
+      deploy: null,
+      tags: ['email', 'deliverability'],
+    },
   ],
 };
 
-function minsAgo(m) {
-  return new Date(Date.now() - m * 60000).toISOString();
-}
+function minsAgo(m) { return new Date(Date.now() - m * 60000).toISOString(); }
 
 if (typeof window !== 'undefined') window.LUINUS_SEED = SEED;
